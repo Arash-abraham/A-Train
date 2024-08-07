@@ -1,6 +1,6 @@
 <h1 align="center">
   <br>
-  <a href="https://github.com/Arash-abraham/A-Train/"><img src="/Img/The-Boys-A-Train-Music-Video-Amazon.avif" alt="A-Train"></a>
+  <a href="https://github.com/Arash-abraham/A-Train/"><img src="/Img/a_train_hd_the_boys-1920x1080.jpg" alt="A-Train"></a>
 
 </h1>
 
