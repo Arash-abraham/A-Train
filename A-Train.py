@@ -23,6 +23,7 @@ def Checker_function():
     while True: 
         try:
             Banner()
+            time.sleep(0.5)
             regex = input(Fore.WHITE + 'Do you want to apply a regex pattern to filter the results' + Fore.LIGHTWHITE_EX + ' (' + Fore.LIGHTBLUE_EX + 'Y ' + Fore.LIGHTWHITE_EX + '/' + Fore.LIGHTBLUE_EX + ' N' + Fore.LIGHTWHITE_EX + ')' + Fore.BLUE + ' ? ' + Fore.WHITE + '').upper()
             if regex == 'Y':
                 With_Regex()
