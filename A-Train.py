@@ -1,10 +1,14 @@
 from colorama import *
 import sys , os , time
 import re
+import platform
 
 def Banner():
+    if platform.system() == "Windows":
+        os.system('cls')
+    else:
+        os.system('clear')
     time.sleep(0.1)
-    os.system('clear')
     time.sleep(0.5)
     print(Fore.BLUE+"""
  █████╗       ████████╗██████╗  █████╗ ██╗███╗   ██╗
