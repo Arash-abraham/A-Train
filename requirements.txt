@@ -1,4 +1,3 @@
 colorama
 re
 platform
-3
