@@ -1,180 +1,210 @@
-# 🚄 A‑Train — نقشهٔ راه توسعهٔ نسخهٔ ۲
+# A-Train — Development Roadmap (v2)
 
-> **سند مرجع توسعه:** ابزار مقایسهٔ دو فایل — سریع‌تر، بهتر، هدفمندتر.
-> این فایل «منبع حقیقت» (Source of Truth) برنامهٔ توسعه است؛ هر فاز که جلو رفت، همین‌جا تیک می‌خورد.
+> **Authoritative planning document** for the redevelopment of A-Train, a high-performance
+> file comparison tool. This document is the single source of truth for the v2 development
+> programme; each phase is tracked and checked off here as it is completed.
 
 ---
 
-## ۰) وضعیت واقعی مخزن — همین حالا
+## 0. Current Repository State
 
-قبل از هر برنامه‌ای، یک یادداشت صادقانه دربارهٔ وضعیتی که **واقعاً** در این برنچ وجود دارد:
+Before any planning, an accurate account of what this branch actually contains at present:
 
-| مسیر | محتوای فعلی |
+| Path | Current Content |
 |---|---|
-| `mian.jsx` | فقط یک خط: `let a = 21;` — جاوااسکریپت، نه پایتون! (احتمالاً تایپ اشتباه `main.jsx`) |
-| `Img/The-Boys-A-Train-Music-Video-Amazon.avif` | تصویر برندینگ (کاراکتر A‑Train) |
-| `Img/a_train_hd_the_boys-1920x1080.jpg` | تصویر برندینگ (کاراکتر A‑Train) |
+| `mian.jsx` | A single line of JavaScript: `let a = 21;` (apparently a typographical error for `main.jsx`) |
+| `Img/The-Boys-A-Train-Music-Video-Amazon.avif` | Branding asset (A-Train character) |
+| `Img/a_train_hd_the_boys-1920x1080.jpg` | Branding asset (A-Train character) |
 
-- **در حال حاضر هیچ کد پایتونی در این مخزن وجود ندارد.** کل تاریخچهٔ گیت یک کامیت است (`292d4e8 — Update mian.jsx`)؛ stash و dangling object هم بررسی شد و چیزی نبود.
-- نتیجهٔ عملی: کد پایتون نسخهٔ قبلی یا هرگز به این مخزن push نشده یا جای دیگری است. دو راه داریم:
-  1. کد قبلی را به همین مخزن بیاوریم و از روی آن توسعه دهیم، یا
-  2. نسخهٔ ۲ را از صفر، دقیقاً طبق همین سند بنویسیم.
-- در هر دو حالت، نقشهٔ زیر معتبر است.
-
----
-
-## ۱) چشم‌انداز (Vision)
-
-A‑Train ابزار مقایسهٔ دو فایل است با چهار ویژگی اصلی:
-
-1. **سریع** — فایل‌های یکسان یا حجیم در کسری از ثانیه جواب می‌گیرند (اسم برنامه بی‌دلیل A‑Train نیست؛ سریع‌ترین عضو The Seven ⚡).
-2. **دقیق** — diff درست، کمینه و خوانا؛ نه سیلابی از تغییر بی‌معنی.
-3. **هدفمند** — هر نوع ورودی (متن / باینری / JSON / CSV / پوشه) حالت اختصاصی خودش را دارد؛ یک الگوریتم عمومی به همهٔ ورودی‌ها تحمیل نمی‌شود.
-4. **توسعه‌پذیر** — خروجی patch‑compatible، قابل استفاده در اسکریپت و CI.
+- **No Python source code exists in this repository at present.** The complete Git history
+  consists of a single commit (`292d4e8 — Update mian.jsx`); inspection of stashes and
+  unreachable objects (`git fsck --lost-found`) recovered nothing further.
+- Practical consequence: the previous Python implementation was either never pushed to this
+  repository or resides elsewhere. There are two paths forward:
+  1. Import the previous implementation into this repository and continue development on top of it; or
+  2. Build v2 from scratch in strict accordance with this document.
+- In either case, the roadmap below remains valid.
 
 ---
 
-## ۲) معماری و ساختار پیشنهادی پروژه
+## 1. Vision
+
+A-Train is a two-file comparison tool defined by four properties:
+
+1. **Fast** — identical or large inputs are resolved in a fraction of a second.
+2. **Accurate** — diffs are correct, minimal, and human-readable.
+3. **Purposeful** — each input class (text, binary, JSON, CSV, directory trees) is served by a
+   dedicated comparison mode; no single general-purpose algorithm is forced upon all inputs.
+4. **Integrable** — patch-compatible output, scriptable, and CI-ready.
+
+---
+
+## 2. Proposed Architecture
 
 ```
 A-Train/
 ├── atrain/
-│   ├── __init__.py            # نسخه و API عمومی
-│   ├── __main__.py            # نقطهٔ ورود: python -m atrain
-│   ├── cli.py                 # آرگومان‌ها و دستورها
+│   ├── __init__.py            # Package version and public API
+│   ├── __main__.py            # Entry point: python -m atrain
+│   ├── cli.py                 # Command-line interface and argument parsing
 │   ├── core/
-│   │   ├── reader.py          # mmap + خواندن چانک‌به‌چانک + تشخیص انکدینگ
-│   │   ├── hasher.py          # هش خطوط/چانک‌ها (BLAKE2)
-│   │   ├── diff_text.py       # Myers + histogram + دو مرحله‌ای
-│   │   ├── diff_binary.py     # مقایسهٔ چانکی + rolling hash
-│   │   ├── diff_structured.py # مقایسهٔ معنایی JSON/CSV
-│   │   └── models.py          # dataclassها: Hunk، DiffResult، FileMeta
+│   │   ├── reader.py          # Memory-mapped, chunked I/O; encoding detection
+│   │   ├── hasher.py          # Line/chunk hashing (BLAKE2)
+│   │   ├── diff_text.py       # Myers + histogram heuristics; two-phase refinement
+│   │   ├── diff_binary.py     # Chunked comparison; rolling-hash region detection
+│   │   ├── diff_structured.py # Semantic comparison for JSON/CSV
+│   │   └── models.py          # Data classes: Hunk, DiffResult, FileMeta
 │   ├── output/
-│   │   ├── unified.py         # خروجی سازگار با patch/git apply
-│   │   ├── side_by_side.py    # نمایش دوستونه در ترمینال
-│   │   ├── color.py           # خروجی رنگی ترمینال
-│   │   ├── html_report.py     # گزارش مستقل HTML
-│   │   └── json_out.py        # خروجی ماشینی
-│   └── tui/                   # (فاز ۴) رابط تعاملی با Textual
+│   │   ├── unified.py         # Patch-compatible unified diff
+│   │   ├── side_by_side.py    # Two-column terminal view
+│   │   ├── color.py           # Colored terminal output
+│   │   ├── html_report.py     # Standalone HTML report
+│   │   └── json_out.py        # Machine-readable output
+│   └── tui/                   # (Phase 4) Interactive terminal UI (Textual)
 ├── tests/
 ├── benchmarks/
-├── Img/                       # تصاویر برند (همین‌هایی که الان هست)
+├── Img/                       # Branding assets (existing)
 ├── README.md
-├── ROADMAP.md                 # ← همین سند
+├── ROADMAP.md                 # This document
 └── pyproject.toml
 ```
 
-اصول معماری:
-- **هستهٔ خالص و بدون وابستگی** — `core/` فقط کتابخانهٔ استاندارد پایتون؛ وابستگی‌های ظاهری (Rich و…) فقط در لایهٔ خروجی و اختیاری.
-- **ورودی/خروجی جدا از منطق** — الگوریتم diff هیچ‌چیز دربارهٔ ترمینال یا HTML نمی‌داند.
-- **همه‌چیز dataclass** — نتیجهٔ diff یک ساختار دادهٔ صریح است که هر خروجی‌ساز از آن می‌خواند.
+Guiding principles:
+
+- **A pure, dependency-free core.** `core/` uses only the Python standard library;
+  presentational dependencies (e.g., Rich) are confined to the output layer and remain optional.
+- **Separation of logic and presentation.** The diff engine has no knowledge of terminals or
+  HTML; formatters consume an explicit result model.
+- **Explicit data models.** Comparison results are plain data classes (`Hunk`, `DiffResult`,
+  `FileMeta`) consumed uniformly by every output formatter.
 
 ---
 
-## ۳) موتور سرعت — تکنیک‌های عملکرد (به ترتیب اثر)
+## 3. Performance Engine
 
-1. **Early‑exit با هش کل فایل** — قبل از هر diff: مقایسهٔ سایز + BLAKE2. فایل‌های یکسان → جواب قطعی بدون حتی یک مقایسهٔ خط.
-2. **خطوط هش‌شده** — خطوط رشته‌ای به الگوریتم diff داده **نمی‌شوند**؛ اول هر خط به یک int هش ۶۴بیتی نگاشت می‌شود و Myers روی آرایهٔ اعداد اجرا می‌شود (ده‌ها برابر سریع‌تر از مقایسهٔ رشته).
-3. **الگوریتم درست به‌جای difflib** — `difflib.SequenceMatcher` بدترین حالت O(n²) دارد و برای fuzzy matching طراحی شده، نه diff. پیاده‌سازی: **Myers O(ND)** با refinement خطی (Hirschberg) + هیوریستیک **histogram** (روش git) برای خروجی خوانا.
-4. **mmap به‌جای read()** — فایل‌های صد مگابایتی کامل در حافظه کپی نمی‌شوند؛ memory‑map می‌شوند و فقط آفست خطوط نگه داشته می‌شود.
-5. **Diff دو مرحله‌ای** — مرحلهٔ اول خط‌به‌خط؛ مرحلهٔ دوم word/char level **فقط داخل hunkهای تغییرکرده**، نه کل فایل.
-6. **مقایسهٔ پوشه موازی** — `ProcessPoolExecutor` برای مقایسهٔ درخت پوشه؛ کار هر فایل مستقل است.
-7. **کش هش اختیاری** — `.atrain-cache` برای تکرار مقایسه‌ها در حلقهٔ توسعه.
-8. **بنچمارک دائمی** — سوئیت benchmark در برابر `git diff` و GNU `diff` و `difflib`؛ اعداد هر انتشار در `benchmarks/RESULTS.md`.
+Techniques ordered by expected impact:
 
-🎯 **هدف عددی:** مقایسهٔ دو فایل متنی ۱۰۰MB در کمتر از ۱ ثانیه روی سخت‌افزار متوسط.
+1. **Hash-based early exit.** Before any diffing: size comparison plus a BLAKE2 digest of the
+   full input. Identical files are resolved definitively without a single line comparison.
+2. **Pre-hashed lines.** Lines are never fed to the diff algorithm as strings; each line is
+   first mapped to a 64-bit integer hash, and the Myers algorithm operates on an integer
+   array — orders of magnitude faster than string comparison.
+3. **The correct algorithm instead of `difflib`.** `difflib.SequenceMatcher` exhibits O(n²)
+   worst-case behaviour and is designed for fuzzy matching, not diffing. Implementation plan:
+   **Myers O(ND)** with linear-space refinement (Hirschberg) plus the **histogram heuristic**
+   (as used by Git) for readable output.
+4. **Memory-mapped I/O.** Large inputs are memory-mapped rather than copied into RAM; only
+   line offsets are retained.
+5. **Two-phase diffing.** A coarse line-level pass first; word/character-level refinement is
+   applied **only within changed hunks**, never across the full input.
+6. **Parallel directory comparison.** Tree comparison is distributed across a
+   `ProcessPoolExecutor`; per-file work is independent.
+7. **Optional hash cache.** A `.atrain-cache` artifact accelerates repeated comparisons in
+   development loops.
+8. **Continuous benchmarking.** A benchmark suite runs against `git diff`, GNU `diff`, and
+   `difflib`; figures are published in `benchmarks/RESULTS.md` for every release.
+
+**Quantitative target:** two 100 MB text files compared in under one second on commodity hardware.
 
 ---
 
-## ۴) حالت‌های هدفمند (Modes)
+## 4. Purpose-Built Comparison Modes
 
-| حالت | رفتار اختصاصی |
+| Mode | Dedicated Behaviour |
 |---|---|
-| `text` | diff خطی + word‑level داخلی؛ گزینه‌های ignore برای whitespace / case / regex |
-| `binary` | مقایسهٔ چانکی (مثلاً ۶۴KB)، یافتن نواحی تغییریافته با rolling hash (Rabin–Karp)، نمایش hex |
-| `json` | مقایسهٔ معنایی: ترتیب کلیدها مهم نیست؛ گزارش مسیر‌محور (JSONPath‑مانند) |
-| `csv` | مقایسه بر اساس کلید ستون؛ گزارش سطرهای افزوده/حذف‌شده/تغییریافته |
-| `dir` | diff درختی: فایل‌های افزوده/حذف‌شده/تغییریافته، سپس diff هر فایل |
+| `text` | Line-based diff with intra-line word-level refinement; whitespace / case / regex ignore options |
+| `binary` | Chunked (e.g., 64 KB) comparison; rolling-hash (Rabin–Karp) change-region detection; hex display |
+| `json` | Semantic comparison independent of key order; path-based (JSONPath-style) change reporting |
+| `csv` | Key-column-aware row comparison; added / removed / modified record reporting |
+| `dir` | Tree diff: added / removed / modified files, followed by per-file diffs |
 
-علاوه بر حالت‌ها:
-- تشخیص خودکار انکدینگ (UTF‑8 → UTF‑16 → latin‑1) و نرمال‌سازی CRLF/LF.
-- تشخیص خودکار حالت از روی محتوا (magic bytes / sniffing) وقتی کاربر حالت نگفته.
+Cross-cutting behaviours:
+
+- Automatic encoding detection (UTF-8 → UTF-16 → latin-1) and CRLF/LF normalization.
+- Automatic mode detection from content (magic bytes / sniffing) when no mode is specified.
 
 ---
 
-## ۵) خروجی‌ها
+## 5. Output Formats
 
-| فرمت | توضیح |
+| Format | Description |
 |---|---|
-| `unified` | سازگار با `patch` و `git apply` |
-| `color` | ترمینال رنگی با شماره خط |
-| `side` | دوستونه (side‑by‑side) |
-| `html` | گزارش مستقل و قابل اشتراک |
-| `json` | ماشینی، برای CI و ابزارهای دیگر |
+| `unified` | Compatible with `patch` and `git apply` |
+| `color` | Colored terminal output with line numbers |
+| `side` | Side-by-side two-column view |
+| `html` | Standalone, shareable report |
+| `json` | Machine-readable output for CI and downstream tooling |
 
 ---
 
-## ۶) رابط کاربری
+## 6. User Interfaces
 
-- **فاز ۱ — CLI:** `atrain file_a file_b --mode text --format color --ignore-space`
-- **فاز ۲ — پیکربندی:** فایل `atrain.toml` با پیش‌فرض‌های هر پروژه.
-- **فاز ۴ — TUI:** رابط تعاملی با [Textual] (اسکرول همزمان، ناوبری کیبوردی شبیه vimdiff).
-- **GUI دسکتاپ (اختیاری/دیرتر):** PySide6 — فقط اگر نیاز واقعی دیده شد.
-
----
-
-## ۷) کیفیت و CI
-
-- `pytest` + `hypothesis`: تست property‑based با این اینواریانت: *«اعمال diff به فایل مبدأ، دقیقاً فایل مقصد را بسازد»*.
-- Golden test در برابر خروجی GNU diffutils.
-- `ruff` + `mypy --strict` روی `core/`.
-- GitHub Actions: تست + بنچمارک روی هر PR.
+- **Phase 1 — CLI:** `atrain file_a file_b --mode text --format color --ignore-space`
+- **Phase 2 — Configuration:** per-project defaults via `atrain.toml`.
+- **Phase 4 — TUI:** interactive terminal interface built on Textual (synchronized scrolling,
+  keyboard navigation).
+- **Desktop GUI (optional, later):** PySide6 — only if a concrete need is demonstrated.
 
 ---
 
-## ۸) فازبندی اجرایی (Milestones)
+## 7. Quality Assurance and Continuous Integration
 
-### 🫀 v0.1 — ضربان قلب
-- [ ] ساختار پروژه + `pyproject.toml`
-- [ ] `reader` + `hasher` + early‑exit
-- [ ] Myers روی آرایهٔ هش + خروجی `unified`
-- [ ] CLI پایه
-- [ ] تست‌های پایه
-
-### 🗣 v0.2 — صدا
-- [ ] خروجی `color` و `side`
-- [ ] گزینه‌های ignore (space/case/regex)
-- [ ] انکدینگ + نرمال‌سازی CRLF
-- [ ] گزارش `html` و `json`
-
-### 💪 v0.3 — عضله
-- [ ] حالت `binary`
-- [ ] حالت `dir` موازی
-- [ ] حالت‌های معنایی `json` / `csv`
-- [ ] بنچمارک رسمی در برابر GNU diff و difflib
-
-### ⚡ v0.4 — لباس سرعت
-- [ ] TUI با Textual
-- [ ] کش هش
-- [ ] پروفایل و بهینه‌سازی (py‑spy)
-- [ ] README نهایی با تصاویر `Img/`
+- `pytest` with `hypothesis` property-based testing, asserting the invariant:
+  *applying the produced diff to the source file must reproduce the target file exactly.*
+- Golden tests validated against GNU diffutils output.
+- `ruff` linting and `mypy --strict` typing on `core/`.
+- GitHub Actions workflow executing tests and benchmarks on every pull request.
 
 ---
 
-## ۹) برندینگ و خانه‌تکانی
+## 8. Execution Milestones
 
-- دو تصویر `Img/` به‌عنوان لوگو/hero در README و مستندات استفاده می‌شوند؛ استعارهٔ «سریع‌ترین» با کاراکتر هم‌خوان است.
-- **پیشنهاد:** فایل `mian.jsx` (یک خط جاوااسکریپتِ `let a = 21;`) به پروژهٔ پایتونی ربطی ندارد و نامش هم تایپ اشتباه به نظر می‌رسد؛ یا حذف شود یا اگر قصد وب‌UI داریم با نام درست نگه داشته شود. **تصمیم با آرش.**
+### v0.1 — Core
+- [ ] Project scaffolding and `pyproject.toml`
+- [ ] `reader`, `hasher`, and hash-based early exit
+- [ ] Myers over hashed lines with `unified` output
+- [ ] Baseline CLI
+- [ ] Baseline test suite
+
+### v0.2 — Presentation
+- [ ] `color` and `side` output formats
+- [ ] Ignore options (whitespace / case / regex)
+- [ ] Encoding detection and CRLF normalization
+- [ ] `html` and `json` reports
+
+### v0.3 — Advanced Modes
+- [ ] `binary` mode
+- [ ] Parallelized `dir` mode
+- [ ] Semantic `json` / `csv` modes
+- [ ] Formal benchmarks against GNU diff and `difflib`
+
+### v0.4 — Interactive UI and Optimization
+- [ ] Textual-based TUI
+- [ ] Hash cache
+- [ ] Profiling and optimization (py-spy)
+- [ ] Final README with branding assets from `Img/`
 
 ---
 
-## ۱۰) معیارهای موفقیت نسخهٔ ۱ (Definition of Done)
+## 9. Branding and Repository Hygiene
 
-1. در بنچمارک، روی فایل‌های ≥۵۰MB حداقل ۲× سریع‌تر از `difflib` و هم‌ردهٔ GNU diff.
-2. صفر diff کاذب در سوئیت تست (تطبیق با GNU diff).
-3. `python -m atrain a b` فقط با کتابخانهٔ استاندارد کار کند (وابستگی ظاهری اختیاری).
-4. README با مثال، خروجی نمونه و تصویر برند.
+- The assets in `Img/` will serve as the project logo and hero imagery in the README and
+  documentation; the speed metaphor is consistent with the character.
+- **Recommendation:** `mian.jsx` (a single line of JavaScript, `let a = 21;`) is unrelated to
+  the Python project and appears to be a naming error. It should either be removed or, if a
+  web UI is intended, renamed appropriately. **Decision pending with the repository owner.**
 
 ---
 
-*آخرین به‌روزرسانی: ۲۰۲۶‑۰۹‑۱۱ — این سند زنده است؛ هر فاز که کامل شد همین‌جا تیک می‌خورد.*
+## 10. Definition of Done (v1)
+
+1. On inputs of 50 MB or larger, at least 2× faster than `difflib` and on par with GNU `diff`
+   in the published benchmark.
+2. Zero false diffs across the test corpus (validated against GNU diff).
+3. `python -m atrain a b` functions with the Python standard library alone; presentational
+   dependencies remain optional.
+4. A complete README with usage examples, sample output, and branding imagery.
+
+---
+
+*Last updated: 2026-09-11. This is a living document; each milestone is checked off here upon completion.*
