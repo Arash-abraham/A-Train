@@ -8,17 +8,20 @@
 
 ## 0. Current Repository State
 
-Before any planning, an accurate account of what this branch actually contains at present:
+At the outset of the v2 programme, the repository contained no Python source code: its full
+Git history consisted of a single commit (`292d4e8`) introducing two branding images and a
+one-line JavaScript placeholder. That placeholder was unrelated to the Python project and has
+been **removed** by decision of the repository owner (2026-09-11). The repository now contains:
 
 | Path | Current Content |
 |---|---|
-| `mian.jsx` | A single line of JavaScript: `let a = 21;` (apparently a typographical error for `main.jsx`) |
+| `README.md` | Project overview |
+| `ROADMAP.md` | This document |
 | `Img/The-Boys-A-Train-Music-Video-Amazon.avif` | Branding asset (A-Train character) |
 | `Img/a_train_hd_the_boys-1920x1080.jpg` | Branding asset (A-Train character) |
 
-- **No Python source code exists in this repository at present.** The complete Git history
-  consists of a single commit (`292d4e8 — Update mian.jsx`); inspection of stashes and
-  unreachable objects (`git fsck --lost-found`) recovered nothing further.
+- **No Python source code exists in this repository at present.** Inspection of stashes and
+  unreachable objects (`git fsck --lost-found`) recovered no prior implementation either.
 - Practical consequence: the previous Python implementation was either never pushed to this
   repository or resides elsewhere. There are two paths forward:
   1. Import the previous implementation into this repository and continue development on top of it; or
@@ -190,9 +193,9 @@ Cross-cutting behaviours:
 
 - The assets in `Img/` will serve as the project logo and hero imagery in the README and
   documentation; the speed metaphor is consistent with the character.
-- **Recommendation:** `mian.jsx` (a single line of JavaScript, `let a = 21;`) is unrelated to
-  the Python project and appears to be a naming error. It should either be removed or, if a
-  web UI is intended, renamed appropriately. **Decision pending with the repository owner.**
+- **Repository hygiene:** the unrelated one-line JavaScript placeholder inherited from the
+  bootstrap commit was removed on 2026-09-11 by decision of the repository owner. Should a
+  web interface ever be planned, a properly named module will be introduced instead.
 
 ---
 
