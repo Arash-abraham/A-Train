@@ -163,11 +163,11 @@ Cross-cutting behaviours:
 ## 8. Execution Milestones
 
 ### v0.1 — Core
-- [ ] Project scaffolding and `pyproject.toml`
-- [ ] `reader`, `hasher`, and hash-based early exit
-- [ ] Myers over hashed lines with `unified` output
-- [ ] Baseline CLI
-- [ ] Baseline test suite
+- [x] Project scaffolding and `pyproject.toml`
+- [x] `reader`, `hasher`, and hash-based early exit
+- [x] Myers over hashed lines with `unified` output
+- [x] Baseline CLI
+- [x] Baseline test suite
 
 ### v0.2 — Presentation
 - [ ] `color` and `side` output formats
@@ -210,4 +210,4 @@ Cross-cutting behaviours:
 
 ---
 
-*Last updated: 2026-09-11. This is a living document; each milestone is checked off here upon completion.*
+*Last updated: 2026-09-18. This is a living document; each milestone is checked off here upon completion.*
