@@ -20,7 +20,9 @@ Design notes (ROADMAP.md, §3):
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from atrain.core.hasher import digest_bytes
@@ -29,19 +31,61 @@ from atrain.core.models import (
     DiffResult,
     FileMeta,
     Hunk,
+    InlineRef,
     LineTag,
     Opcode,
     OpcodeTag,
     compute_stats,
 )
-from atrain.core.reader import line_content, load_bytes, load_text, looks_binary
+from atrain.core.reader import (
+    is_textual,
+    line_content,
+    load_bytes,
+    load_text,
+    split_lines,
+)
 
 MAX_EDIT_COST = 50_000_000
 """Default work budget for the Myers search (inner-loop iterations)."""
 
+INLINE_REF_MAX_CHARS = 300
+"""Pair lines are only character-refined up to this length (cost guard)."""
+
 
 class DiffTooComplex(Exception):
     """Raised internally when the edit script exceeds its work budget."""
+
+
+@dataclass(frozen=True, slots=True)
+class TextOptions:
+    """Comparison options for the text engine (ROADMAP.md, §4, v0.2).
+
+    ``ignore_all_space``/``ignore_case``/``strip_trailing_cr`` affect the
+    *comparison keys* only — rendered output always shows the original
+    line text.  ``ignore_matching`` drops hunks whose changed lines all
+    match the regular expression (GNU ``--ignore-matching-lines``).
+    """
+
+    context: int = 3
+    encoding: str | None = None
+    ignore_all_space: bool = False
+    ignore_case: bool = False
+    ignore_matching: str | None = None
+    strip_trailing_cr: bool = False
+
+
+def comparison_key(line: str, options: TextOptions) -> str:
+    """Normalised form of *line* used for equality comparison."""
+    if options.strip_trailing_cr:
+        if line.endswith("\r\n"):
+            line = line[:-2] + "\n"
+        elif line.endswith("\r"):
+            line = line[:-1]
+    if options.ignore_case:
+        line = line.lower()
+    if options.ignore_all_space:
+        line = "".join(line.split())
+    return line
 
 
 class _Budget:
@@ -349,16 +393,62 @@ def build_hunks(
                     text, nl = line_content(a_lines[k])
                     lines.append(DiffLine(LineTag.CONTEXT, text, nl))
                 continue
-            if row_tag in ("replace", "delete"):
+            if row_tag == "replace":
+                lines.extend(
+                    _replace_lines(a_lines, i1, i2, b_lines, j1, j2)
+                )
+                continue
+            if row_tag == "delete":
                 for k in range(i1, i2):
                     text, nl = line_content(a_lines[k])
                     lines.append(DiffLine(LineTag.DELETE, text, nl))
-            if row_tag in ("replace", "insert"):
+            if row_tag == "insert":
                 for k in range(j1, j2):
                     text, nl = line_content(b_lines[k])
                     lines.append(DiffLine(LineTag.INSERT, text, nl))
         hunks.append(Hunk(a_start, a_end - a_start, b_start, b_end - b_start, lines))
     return hunks
+
+
+def _common_ends(a: str, b: str) -> tuple[int, int]:
+    """Lengths of the equal prefix and suffix runs of *a* and *b*."""
+    limit = min(len(a), len(b))
+    prefix = 0
+    while prefix < limit and a[prefix] == b[prefix]:
+        prefix += 1
+    suffix = 0
+    while suffix < limit - prefix and a[-1 - suffix] == b[-1 - suffix]:
+        suffix += 1
+    return prefix, suffix
+
+
+def _replace_lines(
+    a_lines: Sequence[str], i1: int, i2: int, b_lines: Sequence[str], j1: int, j2: int
+) -> list[DiffLine]:
+    """Render a REPLACE row, pairing lines for character-level refinement.
+
+    The first ``min(#deleted, #inserted)`` lines are paired in order; each
+    pair gets an :class:`InlineRef` marking the common prefix/suffix so
+    formatters can highlight just the changed middle (two-phase diffing,
+    ROADMAP §3.5).
+    """
+    deleted: list[DiffLine] = []
+    for k in range(i1, i2):
+        text, nl = line_content(a_lines[k])
+        deleted.append(DiffLine(LineTag.DELETE, text, nl))
+    inserted: list[DiffLine] = []
+    for k in range(j1, j2):
+        text, nl = line_content(b_lines[k])
+        inserted.append(DiffLine(LineTag.INSERT, text, nl))
+
+    for d_line, i_line in zip(deleted, inserted, strict=False):
+        if len(d_line.text) > INLINE_REF_MAX_CHARS or len(i_line.text) > INLINE_REF_MAX_CHARS:
+            continue
+        prefix, suffix = _common_ends(d_line.text, i_line.text)
+        ref = InlineRef(prefix_len=prefix, suffix_len=suffix)
+        d_line.inline = ref
+        i_line.inline = ref
+    return deleted + inserted
 
 
 def diff_lines(
@@ -367,36 +457,72 @@ def diff_lines(
     context: int = 3,
     budget: _Budget | None = None,
 ) -> list[Hunk]:
-    """Diff two already-split line lists into hunks."""
+    """Diff two already-split line lists into hunks (no ignore options)."""
     ids_a, ids_b = intern_line_pairs(a_lines, b_lines)
     ops = myers_opcodes(ids_a, ids_b, budget)
     return build_hunks(ops, a_lines, b_lines, context)
 
 
+def _hunk_all_matches(hunk: Hunk, pattern: re.Pattern[str]) -> bool:
+    """True when every changed line of *hunk* matches *pattern* (GNU -I)."""
+    changed = [line for line in hunk.lines if line.tag is not LineTag.CONTEXT]
+    return bool(changed) and all(pattern.search(line.text) for line in changed)
+
+
+def diff_line_lists(
+    a_lines: Sequence[str],
+    b_lines: Sequence[str],
+    options: TextOptions | None = None,
+) -> list[Hunk]:
+    """Diff with the full option set (ignore space/case/regex, CR, context)."""
+    opts = options or TextOptions()
+    if opts.context < 0:
+        raise ValueError("context must be >= 0")
+    pattern: re.Pattern[str] | None = None
+    if opts.ignore_matching is not None:
+        pattern = re.compile(opts.ignore_matching)  # may raise re.error
+    keys_a = [comparison_key(line, opts) for line in a_lines]
+    keys_b = [comparison_key(line, opts) for line in b_lines]
+    ids_a, ids_b = intern_line_pairs(keys_a, keys_b)
+    ops = myers_opcodes(ids_a, ids_b)
+    hunks = build_hunks(ops, a_lines, b_lines, opts.context)
+    if pattern is not None:
+        hunks = [hunk for hunk in hunks if not _hunk_all_matches(hunk, pattern)]
+    return hunks
+
+
+def diff_texts(
+    a_text: str, b_text: str, options: TextOptions | None = None
+) -> list[Hunk]:
+    """Diff two complete texts into hunks (convenience for tests/tools)."""
+    return diff_line_lists(split_lines(a_text), split_lines(b_text), options)
+
+
 def compare_files(
     path_a: Path,
     path_b: Path,
-    context: int = 3,
-    encoding: str | None = None,
+    options: TextOptions | None = None,
 ) -> DiffResult:
     """Full text comparison of two files, with hash-based early exit.
 
-    Binary payloads (NUL sniff) are never decoded; the result simply carries
-    ``is_binary`` and no hunks, and presentation layers decide how to report
-    it (the CLI prints a GNU-style one-liner).
+    Binary payloads (NUL sniff) are never decoded on the auto path; the
+    result simply carries ``is_binary`` and no hunks, and presentation
+    layers decide how to report it (the CLI prints a GNU-style one-liner).
+    A forced encoding in *options* overrides the sniff.
     """
+    opts = options or TextOptions()
     with load_bytes(path_a) as raw_a, load_bytes(path_b) as raw_b:
         meta_a = FileMeta(
             path=str(path_a),
             size=raw_a.size,
             digest=digest_bytes(raw_a.data),
-            is_binary=looks_binary(raw_a.data),
+            is_binary=not is_textual(raw_a.data),
         )
         meta_b = FileMeta(
             path=str(path_b),
             size=raw_b.size,
             digest=digest_bytes(raw_b.data),
-            is_binary=looks_binary(raw_b.data),
+            is_binary=not is_textual(raw_b.data),
         )
 
     result = DiffResult(mode="text", source=meta_a, target=meta_b, identical=False)
@@ -404,14 +530,14 @@ def compare_files(
     if meta_a.digest == meta_b.digest and meta_a.size == meta_b.size:
         result.identical = True
         return result
-    if encoding is None and (meta_a.is_binary or meta_b.is_binary):
+    if opts.encoding is None and (meta_a.is_binary or meta_b.is_binary):
         return result  # no hunks; caller reports a binary difference
 
-    lines_a, meta_a = load_text(path_a, encoding)
-    lines_b, meta_b = load_text(path_b, encoding)
+    lines_a, meta_a = load_text(path_a, opts.encoding)
+    lines_b, meta_b = load_text(path_b, opts.encoding)
     result.source = meta_a
     result.target = meta_b
-    result.hunks = diff_lines(lines_a, lines_b, context)
+    result.hunks = diff_line_lists(lines_a, lines_b, opts)
     result.stats = compute_stats(result.hunks)
     result.identical = not result.hunks
     return result

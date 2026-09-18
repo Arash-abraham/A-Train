@@ -19,7 +19,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# Paths required by completed milestones (v0.1).
+# Paths required by completed milestones.
 REQUIRED_V01 = [
     "pyproject.toml",
     "atrain/__init__.py",
@@ -36,14 +36,17 @@ REQUIRED_V01 = [
     "benchmarks/",
 ]
 
+REQUIRED_V02 = [
+    "atrain/output/color.py",
+    "atrain/output/side_by_side.py",
+    "atrain/output/html_report.py",
+    "atrain/output/json_out.py",
+]
+
 # Paths promised by later milestones; absence is informational right now.
 PLANNED = [
     "atrain/core/diff_binary.py",
     "atrain/core/diff_structured.py",
-    "atrain/output/side_by_side.py",
-    "atrain/output/color.py",
-    "atrain/output/html_report.py",
-    "atrain/output/json_out.py",
     "atrain/tui/",
 ]
 
@@ -51,7 +54,7 @@ PLANNED = [
 def main() -> int:
     missing = [
         rel
-        for rel in REQUIRED_V01
+        for rel in REQUIRED_V01 + REQUIRED_V02
         if not (REPO_ROOT / rel).exists()
     ]
     for rel in missing:

@@ -69,25 +69,82 @@ def looks_binary(data: bytes | memoryview) -> bool:
     return b"\x00" in bytes(data[:BINARY_SNIFF_BYTES])
 
 
+def has_bom(data: bytes | memoryview) -> bool:
+    """True when the data starts with a known Unicode BOM."""
+    head = bytes(data[:4])
+    return any(head.startswith(bom) for bom, _name in _BOMS)
+
+
+def is_textual(data: bytes | memoryview) -> bool:
+    """Decidable-as-text check used before refusing to decode.
+
+    Text if: a BOM is present (BOM-bearing UTF-16/32 legitimately contain
+    NUL bytes), the NUL sniff is clean, or the data matches the
+    UTF-16-without-BOM byte pattern.
+    """
+    if has_bom(data):
+        return True
+    if not looks_binary(data):
+        return True
+    return _looks_utf16_without_bom(data) is not None
+
+
+_BOMS: tuple[tuple[bytes, str], ...] = (
+    (b"\xef\xbb\xbf", "utf-8-sig"),
+    (b"\xff\xfe\x00\x00", "utf-32"),  # LE (before UTF-16 LE prefix!)
+    (b"\x00\x00\xfe\xff", "utf-32"),  # BE
+    (b"\xff\xfe", "utf-16"),  # LE
+    (b"\xfe\xff", "utf-16"),  # BE
+)
+
+
+def _looks_utf16_without_bom(data: bytes | memoryview) -> str | None:
+    """Heuristic: every second byte NUL across a long ASCII-ish prefix."""
+    view = bytes(data[:BINARY_SNIFF_BYTES])
+    if len(view) < 8 or len(view) % 2 != 0:
+        return None
+    even_nul = sum(1 for i in range(0, len(view), 2) if view[i] == 0)
+    odd_nul = sum(1 for i in range(1, len(view), 2) if view[i] == 0)
+    half = len(view) // 2
+    if even_nul > half * 0.9:
+        return "utf-16-be"  # NULs at even offsets => big-endian
+    if odd_nul > half * 0.9:
+        return "utf-16-le"
+    return None
+
+
 def decode_text(data: bytes | memoryview, encoding: str | None = None) -> tuple[str, str]:
-    """Decode raw bytes to text.
+    """Decode raw bytes to text (ROADMAP.md, §4: UTF-8 → UTF-16 → latin-1).
 
     Args:
         data: Raw file bytes.
-        encoding: Forced encoding (strict). When ``None``: try UTF-8 first,
-            then fall back to latin-1, which always succeeds and is the
-            documented baseline behaviour for v0.1 (refined in v0.2 with
-            BOM/UTF-16 detection — ROADMAP.md, §4).
+        encoding: Forced encoding (strict, overrides all detection).
+        When ``None``: BOM sniff (UTF-8/16/32), then strict UTF-8, then a
+        UTF-16-without-BOM heuristic, then latin-1, which always succeeds.
 
     Returns:
         ``(text, encoding_name)``.
     """
     if encoding is not None:
         return bytes(data).decode(encoding), encoding
-    try:
-        return bytes(data).decode("utf-8"), "utf-8"
-    except UnicodeDecodeError:
-        return bytes(data).decode(FALLBACK_ENCODING), FALLBACK_ENCODING
+    head = bytes(data[:8])
+    for bom, name in _BOMS:
+        if head.startswith(bom):
+            return bytes(data).decode(name), name
+    if not looks_binary(data):
+        try:
+            return bytes(data).decode("utf-8"), "utf-8"
+        except UnicodeDecodeError:
+            pass
+    # NUL-bearing data without a BOM: UTF-8 "succeeds" on NULs but yields
+    # mojibake, so try the UTF-16 pattern before giving up to latin-1.
+    guessed = _looks_utf16_without_bom(data)
+    if guessed is not None:
+        try:
+            return bytes(data).decode(guessed), guessed
+        except UnicodeDecodeError:
+            pass
+    return bytes(data).decode(FALLBACK_ENCODING), FALLBACK_ENCODING
 
 
 def split_lines(text: str) -> list[str]:
@@ -145,7 +202,7 @@ def load_text(path: Path, encoding: str | None = None) -> tuple[list[str], FileM
     """
     with load_bytes(path) as loaded:
         digest = digest_bytes(loaded.data)
-        is_binary = looks_binary(loaded.data)
+        is_binary = not is_textual(loaded.data)
         if is_binary and encoding is None:
             # Auto-detection path: text engines never decode binary
             # payloads; callers decide.  A *forced* encoding overrides the

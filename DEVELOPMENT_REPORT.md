@@ -6,6 +6,65 @@ without a corresponding run recorded in `test/TEST_REPORT.md`.
 
 ---
 
+## Milestone v0.2 — Presentation (2026-09-18)
+
+### 1. What was implemented
+
+- **Ignore options** (`core/diff_text.TextOptions`): `--ignore-space`
+  (all whitespace), `--ignore-case`, `--ignore-matching REGEX` (drops
+  hunks whose changed lines all match — GNU `-I` semantics),
+  `--strip-trailing-cr` (CRLF/LF equality).  Normalisation affects
+  *comparison keys only*; rendered lines keep the original text.
+- **Encoding detection** (`core/reader.decode_text`): BOM sniff
+  (UTF-8-sig / UTF-16 LE+BE / UTF-32 LE+BE) → strict UTF-8 →
+  UTF-16-without-BOM byte-pattern heuristic → latin-1 fallback.
+  Forced `--encoding` overrides everything and is strict.
+- **Binary-vs-text decision** (`core/reader.is_textual`): a BOM wins over
+  the NUL sniff; a UTF-16 byte pattern wins over the NUL sniff.
+- **Two-phase intra-line refinement** (ROADMAP §3.5): inside every
+  REPLACE block the first min(#del, #ins) line pairs get an
+  `InlineRef(prefix_len, suffix_len)` (common char runs), capped at
+  300 chars per line.  Formatters highlight only the changed middle.
+- **`output/color.py`**: ANSI output with line numbers on both sides,
+  bold changed-middle highlighting, `--color auto/always/never`
+  (auto = TTY and not writing to a file).
+- **`output/side_by_side.py`**: sdiff-style two-column view with
+  `|`/`<`/`>` marks, `--width` (default: terminal width), truncation.
+- **`output/html_report.py`**: standalone, self-contained HTML report
+  (embedded CSS, no JS/external refs), metadata table, `<mark>` inline
+  highlighting, HTML-escaped content.
+- **`output/json_out.py`**: stable, deterministic JSON document (mode,
+  identical, stats, per-file metadata incl. digest/encoding/newline,
+  full hunk model).  For CI pipelines.
+- **CLI**: `--format` now {unified, color, side, html, json}; identical
+  inputs stay silent for terminal formats but html/json still emit a
+  document (exit 0).  Package version bumped to 0.2.0.
+- **Tests:** 52 new tests (options, encoding, inline refinement, four
+  formatters, CLI v0.2 surface) — 171 total, all passing.
+
+### 2. Bugs encountered and fixed (all real, all reproduced by a test)
+
+| # | Symptom | Root cause | Fix | Regression test |
+|---|---|---|---|---|
+| 1 | UTF-16 (BOM) files reported "Binary files differ" | NUL sniff classified BOM-bearing UTF-16 as binary before decoding | `reader.is_textual`: BOM ⇒ text, UTF-16 pattern ⇒ text | `tests/test_encoding.py` + `test_cli_v02.py::test_encoding_flag_end_to_end` |
+| 2 | BOM-less UTF-16 decoded as UTF-8 mojibake | NUL is *valid* UTF-8, so the strict UTF-8 attempt succeeded and short-circuited | skip the UTF-8 attempt when NUL sniff fires; try UTF-16 heuristic first | `test_encoding.py::test_utf16_without_bom_detected_by_heuristic` |
+| 3 | side-by-side rows overflowed the requested width | column formula `(width-3)//2` ignored the 14 chars of per-row chrome | `_ROW_OVERHEAD = 14` factored into the formula | `test_formatters.py::test_side_layout_and_marks`, `test_cli_v02.py::test_side_width_option` |
+| 4 | dangling ANSI sequences (`ESC[31mESC[0m`) around empty highlight segments | `_paint_inline` emitted codes for empty prefix/suffix parts | empty segments emit nothing | `test_cli_v02.py::test_color_always_vs_never` |
+| 5 | (test-design) early inline expectations assumed wrong prefix/suffix splits (e.g. `"foo = 1"` vs `"foo = 2"` has *no* common suffix) | authoring error, not engine error | expectations corrected against the documented definition | `tests/test_inline.py` |
+
+### 3. Design notes
+
+- `--ignore-matching` drops whole hunks (all *changed* lines must match),
+  matching GNU `--ignore-matching-lines`; when every hunk is dropped the
+  result is "identical" and the exit code is 0.
+- With `--ignore-space`, comparison keys lose the trailing newline too
+  (whitespace removal eats it); harmless because terminators are uniform
+  within a split.
+- Forced `--encoding` on a genuinely binary file decodes anyway
+  (`diff --text` behaviour) and `is_binary` stays accurate in metadata.
+
+---
+
 ## Milestone v0.1 — Core (2026-09-18)
 
 ### 1. What was implemented
