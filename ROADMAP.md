@@ -170,10 +170,10 @@ Cross-cutting behaviours:
 - [x] Baseline test suite
 
 ### v0.2 — Presentation
-- [ ] `color` and `side` output formats
-- [ ] Ignore options (whitespace / case / regex)
-- [ ] Encoding detection and CRLF normalization
-- [ ] `html` and `json` reports
+- [x] `color` and `side` output formats
+- [x] Ignore options (whitespace / case / regex)
+- [x] Encoding detection and CRLF normalization
+- [x] `html` and `json` reports
 
 ### v0.3 — Advanced Modes
 - [ ] `binary` mode

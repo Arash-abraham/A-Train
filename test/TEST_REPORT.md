@@ -35,3 +35,25 @@ Environment facts come from `test/00_environment/check_env.py`.
 - Two exploratory scripts (`verify_structure.py`, `profile_diff_text.py`)
   had path/import defects on first run; fixed and re-run (they are not
   part of the pytest suite).
+
+---
+
+## Test Run — v0.2 Presentation (final validation)
+
+- **Date:** 2026-09-18
+- **Phase:** v0.2 — Presentation
+- **Command:** `python3 -m pytest tests/ -q` · `python3 -m ruff check .` · `python3 -m mypy`
+- **Environment:** Python 3.11.2, Linux 6.1.158+ (x86_64), 2 CPUs,
+  pytest 9.1.1, hypothesis 6.168.0, ruff 0.16.8, mypy 2.3.1,
+  GNU diffutils 3.8, GNU patch
+- **Result:** 171 passed / 0 failed; ruff clean; mypy --strict clean
+  (14 source files)
+
+### History (development-time runs, chronological)
+
+| # | Run | Result | Notes |
+|---|---|---|---|
+| 1 | `pytest` after new v0.2 suites | 10 failed / 161 passed | 5 test-authoring errors (wrong expected splits/marks/tags), UTF-16-BOM binary misclassification (bug #1), UTF-8-on-NUL mojibake (bug #2), side width overflow (bug #3) — see DEVELOPMENT_REPORT §v0.2.2 |
+| 2 | `pytest` after fixes | 171 passed / 0 failed | |
+| 3 | `ruff check .` | 13 findings (E501/E741) | fixed; clean |
+| 4 | `mypy` (strict) | clean, 14 files | |

@@ -71,18 +71,34 @@ class Opcode:
     b_end: int
 
 
+@dataclass(frozen=True, slots=True)
+class InlineRef:
+    """Character-level refinement of a paired DELETE/INSERT line.
+
+    ``prefix_len`` and ``suffix_len`` are the lengths of the equal
+    leading/trailing runs shared by the two paired line texts; everything
+    between is what actually changed (two-phase diffing, ROADMAP §3.5).
+    """
+
+    prefix_len: int
+    suffix_len: int
+
+
 @dataclass(slots=True)
 class DiffLine:
     """One rendered line inside a :class:`Hunk`.
 
     ``text`` never contains the trailing newline; ``newline`` records whether
     the original source line ended with one, so formatters can emit
-    ``\\ No newline at end of file`` markers.
+    ``\\ No newline at end of file`` markers.  ``inline`` is set only on
+    DELETE/INSERT lines that were paired with an opposite-side line inside
+    a REPLACE block (see :class:`InlineRef`).
     """
 
     tag: LineTag
     text: str
     newline: bool = True
+    inline: InlineRef | None = None
 
 
 @dataclass(slots=True)
