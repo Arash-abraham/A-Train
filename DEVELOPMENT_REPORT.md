@@ -6,6 +6,122 @@ without a corresponding run recorded in `test/TEST_REPORT.md`.
 
 ---
 
+## Milestone v0.4 — Interactive UI and Optimization (2026-09-18)
+
+### 1. What was implemented
+
+- **`atrain/tui/`** (new package): Textual-based interactive diff viewer
+  (`DiffTui`) — single synchronized color-coded stream, hunk navigation
+  (n/p), scrolling (j/k/g/G), live reload (r). Textual is imported
+  lazily; the CLI fails with an installation hint instead of a traceback.
+  Tested headless via Textual's `run_test()` pilot.
+- **`core/cache.py`** (new): JSON digest cache keyed by
+  `(path, size, mtime_ns)`, sorted-key atomic writes, corrupt-cache
+  discard, `MAX_ENTRIES` pruning. Wired into `diff_tree` via
+  `TreeOptions(use_cache, cache_path)` — hit entries skip hashing
+  entirely (verified: a second run performs zero digest calls).
+- **CLI**: `--tui` (files only, refuses non-TTY stdin/stdout with a clear
+  error instead of hanging), `--cache` (dir mode only).
+- **Wall-clock guard** (`diff_text.MAX_DIFF_SECONDS`, default 2 s):
+  `_Budget` now also checks `time.monotonic()` every 65 536 work units.
+  Pathological inputs fall back to the coarse-but-exact edit script
+  instead of burning the full operation budget. Fallback correctness is
+  regression-tested (target reconstruction).
+- **py-spy-guided micro-optimisations** (evidence:
+  `test/16_performance/pyspy_smallchange_30mb.txt`): fused
+  split+newline-classification in `reader._split_and_classify` (removes
+  a measured 12% phase), `setdefault`-based interning (~7% of intern
+  phase), pop-based `split_lines` (~8%).
+- **README rewritten** with `Img/` hero asset, real usage for every
+  mode/format/flag, and measured performance figures.
+- **Benchmarks re-run** after the changes (see RESULTS.md delta table):
+  `alternating_5mb` 49.404 s → **2.665 s**.
+
+### 2. Issues encountered and fixed
+
+| # | Symptom | Root cause | Fix | Regression test |
+|---|---|---|---|---|
+| 1 | `--tui` hung forever in a non-interactive shell (sandbox timeout) | Textual waited for a terminal that never came | `_run_tui` refuses without a TTY (`exit 2`, clear message) | `tests/test_tui_cache.py::TestCliV04Flags::test_tui_rejected_without_tty` |
+| 2 | `NameError: time` at first deadline check | the `import time` edit landed outside the applied replacement | import added properly | covered by the deadline tests |
+| 3 | `IndexError` risk on 1-char `"
+"` lines in the fused classifier | `line[-2]` on a bare-newline line | suffix-based `endswith` checks + 8-case equivalence test vs `split_lines`/`detect_newline` | `test_split_and_classify_equivalence` |
+| 4 | 30 MB profile showed a second, spurious tail difference in the *profiler's own* corpus | shorter replacement line shifted the generator's byte accounting (same generator bug as §v0.3.4) | profiler builds the full line list first, mutates a copy | documented in the profiler header; generator fix pattern shared with benchmarks |
+
+### 3. Environment note (honesty)
+
+`~/.local` and `~/.cache` are not persisted in this workspace between
+sessions; the toolchain (pytest, mypy, ruff, hypothesis, textual, py-spy)
+and the digest cache were reinstalled/recreated during the session. The
+`--cache` correctness tests use explicit cache paths inside `tmp_path`
+and are unaffected.
+
+---
+
+## Milestone v0.3 — Advanced Modes (2026-09-18)
+
+### 1. What was implemented
+
+- **`core/diff_binary.py`**: hash-based early exit, block-wise common
+  prefix/suffix trimming with byte refinement, then a block walk over the
+  differing interior with **Rabin–Karp-style rolling-hash resync** —
+  candidate needle starts `b[pb+c]` for `c = 0..64` are matched against a
+  single rolling scan (hash matches verified byte-wise, so collisions can
+  never corrupt results).  Unresyncable interiors degrade to one coarse
+  region.  A `hexdump` renderer (`output/hex.py`) backs CLI/HTML output.
+- **`core/diff_structured.py`**: semantic JSON (order-insensitive objects,
+  JSONPath-style change locations, JSON number semantics with strict
+  bool≠int, truncated value previews) and CSV (positional or **key-column**
+  matching by header name or 1-based index, field-level modified rows,
+  first-occurrence duplicate policy, deterministic sorted output).
+  Malformed input raises `ValueError` → CLI exit 2.
+- **`core/diff_tree.py`** (architecture addition, documented below):
+  sorted deterministic walks, file/dir classification
+  (added/removed/modified/unchanged/error), **ProcessPoolExecutor**
+  parallelism for both digesting and per-file diffs, sequential fallback,
+  per-file errors captured instead of fatal, binary modified files get
+  region-based child diffs, empty dirs on one side reported as dir
+  entries.
+- **Formatters**: `unified`/`color`/`html`/`json` extended to all modes
+  (`side` remains text-only and is rejected with a clear message
+  otherwise); dir reports embed per-file diffs; JSON documents nest child
+  results.
+- **CLI**: `--mode {text,binary,json,csv,dir}`, `--key-col`, `--workers`.
+- **`benchmarks/run_benchmarks.py` + `benchmarks/RESULTS.md`**: formal
+  benchmarks vs difflib and GNU diff (see the results page for the full
+  honest reading; highlights below).
+
+### 2. Architecture additions (documented per the project rules)
+
+- `core/diff_tree.py` is new: the ROADMAP §2 tree lists no tree-compare
+  module; neither `diff_text` nor `diff_structured` owns walking.
+- `output/hex.py` is new: hexdump rendering shared by unified/HTML output.
+
+### 3. Bugs encountered and fixed (all real, all reproduced by a test)
+
+| # | Symptom | Root cause | Fix | Regression test |
+|---|---|---|---|---|
+| 1 | `_common_suffix` returned a too-long suffix (golden trim test failed) | the mismatch scan walked the block from its *left* edge instead of the right | scan `k = 1..step` from the block's right edge | `tests/test_binary.py::test_trim_common_ends_exactness` |
+| 2 | Three isolated 3-byte changes in 60 KiB collapsed into ONE coarse region | resync needle started at the corrupted bytes, so it matched nowhere and the engine gave up for the whole interior | **skip-resync**: candidate needles `b[pb+c]`, c ≤ 64, matched against one rolling scan | `tests/test_binary.py::test_multiple_separated_regions` + the region-reconstruction invariant |
+| 3 | Dir mode produced empty textual children for modified *binary* files | `compare_files` refuses to decode binaries and returned no hunks | the tree worker switches to `compare_binary` for binary payloads | `tests/test_tree.py::test_binary_files_in_tree` |
+| 4 | Benchmark "small change" corpora contained a *second, spurious* difference at the file tail (found while validating RESULTS numbers; also affected the exploratory phase-profiler) | replacing a line with a shorter string shifted the writer's byte accounting, so the generator appended extra lines to one file | corpora are built as full line lists first; mutation applies afterwards (byte accounting unaffected) | generator fix visible in `benchmarks/run_benchmarks.py::_make`; the 100 MB phase profiler (`test/16_performance/`) documents the same pitfall |
+
+### 4. Performance facts (full data and discussion in benchmarks/RESULTS.md)
+
+- `identical_100mb`: **0.338 s** — the ROADMAP "100 MB < 1 s" target is
+  met for identical inputs (hash-based early exit).
+- `small_change_100mb`: 3.644 s — target missed; the phase profiler
+  shows the algorithm itself costs 0.19 s while pure-Python decode/split
+  (1.9 s) and interning (1.4 s) dominate. Evidence recorded;
+  remediation documented as IMPROVEMENT_SUGGESTIONS #7, **not
+  implemented**.
+- `alternating_5mb`: 49.4 s (complexity-guard budget burn) vs GNU 0.032 s
+  — documented weakness; time-based cutoff suggestion upgraded to High.
+- vs difflib (measured inputs): 4.6× (identical_5mb) to 19× (scattered)
+  faster; difflib times out at 60 s on alternating_5mb and is capped
+  above ~6 MiB.
+
+---
+
 ## Milestone v0.2 — Presentation (2026-09-18)
 
 ### 1. What was implemented

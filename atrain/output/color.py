@@ -14,6 +14,7 @@ BOLD = "\x1b[1m"
 DIM = "\x1b[2m"
 RED = "\x1b[31m"
 GREEN = "\x1b[32m"
+YELLOW = "\x1b[33m"
 CYAN = "\x1b[36m"
 
 _WIDTH = 4  # line-number field width
@@ -36,6 +37,28 @@ def _paint_inline(text: str, color: str, inline: tuple[int, int] | None) -> str:
         f"{color}{text[middle_end:]}{RESET}" if middle_end < len(text) else "",
     ]
     return "".join(parts)
+
+
+def _colorize_lines(text: str) -> str:
+    """Paint pre-rendered plain lines by their leading marker."""
+    out: list[str] = []
+    for line in text.splitlines(keepends=True):
+        stripped = line.rstrip("\n")
+        if stripped.startswith(("---", "+++")) or stripped.startswith("@@"):
+            out.append(f"{BOLD}{CYAN}{stripped}{RESET}\n")
+            continue
+        if stripped.startswith("errors:"):
+            out.append(f"{BOLD}{RED}{stripped}{RESET}\n")
+            continue
+        head = stripped[:1]
+        if head in ("+", "-", "~", "!"):
+            paint = {"+": GREEN, "-": RED, "~": YELLOW, "!": RED}[head]
+            out.append(f"{paint}{stripped}{RESET}\n")
+        elif stripped.startswith("Binary files"):
+            out.append(f"{BOLD}{stripped}{RESET}\n")
+        else:
+            out.append(line)
+    return "".join(out)
 
 
 def _line(
@@ -70,9 +93,20 @@ def _line(
 
 
 def render(result: DiffResult, a_label: str, b_label: str, color: bool = True) -> str:
-    """Render *result* with ANSI colours and line numbers (empty if identical)."""
+    """Render *result* with ANSI colours and line numbers (empty if identical).
+
+    Non-text modes reuse the plain-text renderers and paint lines by their
+    leading marker (``+``/``-``/``~``/``!``/headers).
+    """
+    if result.identical:
+        return ""
+    if result.mode != "text":
+        from atrain.output import unified
+
+        text = unified.render(result, a_label, b_label)
+        return _colorize_lines(text) if color else text
     has_binary = result.source.is_binary or result.target.is_binary
-    if result.identical or (not result.hunks and not has_binary):
+    if not result.hunks and not has_binary:
         return ""
     out: list[str] = []
     if color:

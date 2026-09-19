@@ -43,6 +43,20 @@ REQUIRED_V02 = [
     "atrain/output/json_out.py",
 ]
 
+REQUIRED_V03 = [
+    "atrain/core/diff_binary.py",
+    "atrain/core/diff_structured.py",
+    "atrain/core/diff_tree.py",
+    "benchmarks/run_benchmarks.py",
+    "benchmarks/RESULTS.md",
+]
+
+REQUIRED_V04 = [
+    "atrain/core/cache.py",
+    "atrain/tui/__init__.py",
+    "atrain/tui/app.py",
+]
+
 # Paths promised by later milestones; absence is informational right now.
 PLANNED = [
     "atrain/core/diff_binary.py",
@@ -54,7 +68,7 @@ PLANNED = [
 def main() -> int:
     missing = [
         rel
-        for rel in REQUIRED_V01 + REQUIRED_V02
+        for rel in REQUIRED_V01 + REQUIRED_V02 + REQUIRED_V03 + REQUIRED_V04
         if not (REPO_ROOT / rel).exists()
     ]
     for rel in missing:

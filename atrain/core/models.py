@@ -121,12 +121,50 @@ class DiffStats:
     hunks: int
 
 
+@dataclass(frozen=True, slots=True)
+class BinaryRegion:
+    """A byte range where two binary files differ (half-open, per file)."""
+
+    a_start: int
+    a_end: int
+    b_start: int
+    b_end: int
+
+
+@dataclass(frozen=True, slots=True)
+class NodeChange:
+    """One path-based change from a structured (JSON/CSV) comparison.
+
+    ``path`` is a JSONPath-style location (``$.users[2].name``) for JSON
+    or a row location (``row[key=42].qty``) for CSV.  ``old``/``new`` hold
+    preview renderings of the values (``None`` when absent).
+    """
+
+    path: str
+    change: str  # "added" | "removed" | "changed"
+    old: str | None = None
+    new: str | None = None
+    detail: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class TreeEntry:
+    """One file or directory classification in a tree comparison."""
+
+    path: str  # relative to the compared roots, ``/``-separated
+    change: str  # "added" | "removed" | "modified" | "unchanged" | "error"
+    kind: str  # "file" | "dir"
+    detail: str = ""  # e.g. error message
+
+
 @dataclass(slots=True)
 class DiffResult:
     """The complete outcome of one comparison.
 
     Formatters must rely exclusively on this model; engines must never
-    pre-format output.
+    pre-format output.  A result carries exactly the payload its ``mode``
+    produces: ``hunks`` (text), ``regions`` (binary), ``nodes``
+    (json/csv), ``entries``/``children`` (dir).
     """
 
     mode: str
@@ -135,6 +173,11 @@ class DiffResult:
     identical: bool
     hunks: list[Hunk] = field(default_factory=list)
     stats: DiffStats = field(default_factory=lambda: DiffStats(added=0, removed=0, hunks=0))
+    regions: list[BinaryRegion] = field(default_factory=list)
+    nodes: list[NodeChange] = field(default_factory=list)
+    entries: list[TreeEntry] = field(default_factory=list)
+    children: dict[str, DiffResult] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
 
 
 def compute_stats(hunks: list[Hunk]) -> DiffStats:
