@@ -21,6 +21,7 @@ Design notes (ROADMAP.md, §3):
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -88,31 +89,57 @@ def comparison_key(line: str, options: TextOptions) -> str:
     return line
 
 
+MAX_DIFF_SECONDS = 2.0
+"""Wall-clock guard for the Myers search (ROADMAP.md, §8 v0.4).
+
+The operation budget alone lets pathological inputs burn the full
+budget — measured at ~49 s on a 5 MiB file with every other line
+changed (benchmarks/RESULTS.md).  A wall-clock deadline bounds that
+latency; the fallback stays correct, only less minimal.  The deadline is
+generous on purpose: ordinary inputs never approach it, so results stay
+deterministic in practice.
+"""
+
+_BUDGET_CHECK_INTERVAL = 65_536
+
+
 class _Budget:
-    """Simple countdown of allowed search work."""
+    """Countdown of allowed search work plus a wall-clock deadline.
 
-    __slots__ = ("remaining",)
+    The clock is consulted only every ``_BUDGET_CHECK_INTERVAL`` work
+    units — ``time.monotonic()`` is far too slow to call per iteration.
+    """
 
-    def __init__(self, limit: int) -> None:
+    __slots__ = ("remaining", "deadline", "_since_check")
+
+    def __init__(self, limit: int, deadline: float | None = None) -> None:
         self.remaining = limit
+        self.deadline = deadline if deadline is not None else (
+            time.monotonic() + MAX_DIFF_SECONDS
+        )
+        self._since_check = 0
 
     def spend(self, work: int) -> None:
         self.remaining -= work
         if self.remaining < 0:
             raise DiffTooComplex
+        self._since_check += work
+        if self._since_check >= _BUDGET_CHECK_INTERVAL:
+            self._since_check = 0
+            if time.monotonic() > self.deadline:
+                raise DiffTooComplex
 
 
 def _intern_into(ids: dict[str, int], lines: Sequence[str]) -> list[int]:
-    """Intern *lines* into the shared *ids* table, returning their id list."""
-    out: list[int] = []
-    append = out.append
-    for line in lines:
-        i = ids.get(line)
-        if i is None:
-            i = len(ids)
-            ids[line] = i
-        append(i)
-    return out
+    """Intern *lines* into the shared *ids* table, returning their id list.
+
+    ``setdefault``-with-``len`` is measurably faster than an explicit
+    get/insert branch (py-spy-guided micro-optimisation, 2026-09-18) and
+    assigns exactly the same ids: for a new key ``len(ids)`` is the
+    not-yet-incremented size, for a known key the default is discarded.
+    """
+    setdefault = ids.setdefault
+    return [setdefault(line, len(ids)) for line in lines]
 
 
 def intern_lines(lines: Sequence[str]) -> list[int]:

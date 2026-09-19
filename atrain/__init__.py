@@ -9,6 +9,6 @@ from __future__ import annotations
 
 from atrain.core.models import DiffResult, DiffStats, FileMeta, Hunk
 
-__version__ = "0.2.0"
+__version__ = "0.4.0"
 
 __all__ = ["DiffResult", "DiffStats", "FileMeta", "Hunk", "__version__"]

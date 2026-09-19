@@ -41,7 +41,7 @@ def _line_json(line: DiffLine) -> dict[str, object]:
 
 def as_dict(result: DiffResult) -> dict[str, object]:
     """Convert *result* into the JSON-serialisable document."""
-    return {
+    doc: dict[str, object] = {
         "tool": "atrain",
         "version": __version__,
         "mode": result.mode,
@@ -64,6 +64,42 @@ def as_dict(result: DiffResult) -> dict[str, object]:
             for hunk in result.hunks
         ],
     }
+    if result.regions:
+        doc["regions"] = [
+            {
+                "a_start": region.a_start,
+                "a_end": region.a_end,
+                "b_start": region.b_start,
+                "b_end": region.b_end,
+            }
+            for region in result.regions
+        ]
+    if result.nodes:
+        doc["nodes"] = [
+            {
+                "path": node.path,
+                "change": node.change,
+                "old": node.old,
+                "new": node.new,
+                "detail": node.detail,
+            }
+            for node in result.nodes
+        ]
+    if result.entries:
+        doc["entries"] = [
+            {
+                "path": entry.path,
+                "change": entry.change,
+                "kind": entry.kind,
+                "detail": entry.detail,
+            }
+            for entry in result.entries
+        ]
+    if result.children:
+        doc["children"] = {rel: as_dict(child) for rel, child in result.children.items()}
+    if result.errors:
+        doc["errors"] = list(result.errors)
+    return doc
 
 
 def render(result: DiffResult) -> str:

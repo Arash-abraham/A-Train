@@ -176,16 +176,16 @@ Cross-cutting behaviours:
 - [x] `html` and `json` reports
 
 ### v0.3 — Advanced Modes
-- [ ] `binary` mode
-- [ ] Parallelized `dir` mode
-- [ ] Semantic `json` / `csv` modes
-- [ ] Formal benchmarks against GNU diff and `difflib`
+- [x] `binary` mode
+- [x] Parallelized `dir` mode
+- [x] Semantic `json` / `csv` modes
+- [x] Formal benchmarks against GNU diff and `difflib`
 
 ### v0.4 — Interactive UI and Optimization
-- [ ] Textual-based TUI
-- [ ] Hash cache
-- [ ] Profiling and optimization (py-spy)
-- [ ] Final README with branding assets from `Img/`
+- [x] Textual-based TUI
+- [x] Hash cache
+- [x] Profiling and optimization (py-spy)
+- [x] Final README with branding assets from `Img/`
 
 ---
 

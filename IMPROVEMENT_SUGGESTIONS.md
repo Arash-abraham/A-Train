@@ -21,16 +21,27 @@ scale the budget by input size (as Git's `diffcore` heuristics do).
 ### Expected benefit
 Bounded wall-clock latency on pathological inputs.
 
+### Measured evidence (2026-09-18, benchmarks/RESULTS.md)
+`alternating_5mb` (every 2nd line of a ~5 MiB file changed) burns the
+full 50M-iteration budget: **49.4 s** in A-Train vs **0.032 s** GNU diff.
+A time-based cutoff of ~1-2 s would cut this by an order of magnitude
+while keeping the fallback correct.
+
 ### Potential downside
 Results become machine-dependent (a slow machine may coarsen a diff the
 fast machine computes minimally) — worse determinism.
 
 ### Priority
-Medium.
+**High** (upgraded from Medium after the v0.3 measurements).
 
-### Why it is not implemented
-Not required by the v0.1 milestone; the current budget already guarantees
-correctness. Deferred as a v0.4-optimization candidate.
+### Status update (2026-09-18, v0.4)
+**Implemented** — `diff_text.MAX_DIFF_SECONDS` (default 2 s, checked
+every 65 536 work units) aborts the search and falls back to the coarse
+interior REPLACE. Measured: `alternating_5mb` 49.4 s → 2.665 s
+(benchmarks/RESULTS.md); fallback correctness verified by
+`tests/test_tui_cache.py::TestV04Optimizations`. Moved out of this file's
+"not implemented" scope accordingly; the machine-dependence downside is
+accepted and documented in the module docstring.
 
 ---
 
@@ -130,3 +141,60 @@ Medium (decide during v0.3).
 
 ### Why it is not implemented
 v0.3 milestone work has not started yet.
+
+---
+
+## 6. Array matching for JSON diffs (similarity-based, not index-based)
+
+### Current behavior
+JSON arrays are compared index-wise: inserting an element at the front of
+a 1000-element array reports 1000 changes.
+
+### Suggested improvement
+Match array elements by similarity or by key field (like CSV key columns)
+before reporting, so a single insertion is reported as one insertion.
+
+### Expected benefit
+Dramatically smaller change lists for list-heavy documents.
+
+### Potential downside
+Heuristics can mis-pair elements; matching cost is super-linear.
+
+### Priority
+Medium.
+
+### Why it is not implemented
+Index-wise comparison is deterministic and predictable; ROADMAP only
+requires "semantic comparison independent of key order" (objects), which
+is implemented.
+
+---
+
+## 7. C-level text pipeline for the 100 MB target on *changed* inputs
+
+### Current behavior
+`small_change_100mb` runs in 3.6 s. Phase profile: decode+split 1.9 s,
+interning 1.4 s, Myers 0.19 s. The algorithm is fast; pure-Python
+per-line text processing is the bottleneck. (identical_100mb already
+meets the <1 s target via the hash early exit: 0.34 s.)
+
+### Suggested improvement
+Index line offsets over the mmap buffer without materialising decoded
+strings; hash lines with BLAKE2b over byte slices; decode only the lines
+inside hunks. Alternatively accept a compiled helper (setuptools C
+module) — trading the "zero hard dependencies" principle.
+
+### Expected benefit
+Likely brings 100 MB small-change under ~1.5 s; possibly under 1 s.
+
+### Potential downside
+Significant complexity in `reader`/`diff_text`; lazy decoding changes the
+invariant that formatters receive decoded text eagerly.
+
+### Priority
+High (this is the roadmap's headline target).
+
+### Why it is not implemented
+The current milestone plan (§8) does not include a compiled pipeline;
+re-architecting the reader exceeds the "improvement" boundary defined for
+this programme and is therefore documented, not implemented.
