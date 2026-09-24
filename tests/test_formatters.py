@@ -117,6 +117,37 @@ def test_html_inline_highlight(tmp_path: Path) -> None:
     assert "<mark>" in text
 
 
+def test_html_hunk_header_matches_unified(tmp_path: Path) -> None:
+    from atrain.output.unified import hunk_header
+
+    # Pure insertion into an empty file: GNU/unified writes "-0,0".
+    result = _result(tmp_path, "", "new\n")
+    text = html_report.render(result, "a", "b")  # type: ignore[arg-type]
+    header = hunk_header(result.hunks[0])  # type: ignore[attr-defined]
+    assert header == "@@ -0,0 +1 @@"
+    assert header in text
+
+
+def test_html_no_newline_marker(tmp_path: Path) -> None:
+    result = _result(tmp_path, "one", "two")
+    text = html_report.render(result, "a", "b")  # type: ignore[arg-type]
+    assert text.count("No newline at end of file") == 2
+
+
+def test_html_labels_and_dark_mode(tmp_path: Path) -> None:
+    result = _result(tmp_path, "x\n", "y\n")
+    text = html_report.render(result, "left<1>.txt", "right.txt")  # type: ignore[arg-type]
+    assert "left&lt;1&gt;.txt" in text and "right.txt" in text
+    assert "prefers-color-scheme: dark" in text
+    assert "<script" not in text
+
+
+def test_html_hex_preview_ellipsis() -> None:
+    data = bytes(range(40))
+    assert html_report._hex_preview(data, 0, 40, limit=4) == "00 01 02 03 …"
+    assert html_report._hex_preview(data, 0, 2) == "00 01"
+
+
 # ---------------------------------------------------------------- json
 
 def test_json_structure_round_trip(tmp_path: Path) -> None:
