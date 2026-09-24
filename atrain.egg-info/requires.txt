@@ -1,0 +1,9 @@
+
+[dev]
+pytest>=7
+hypothesis>=6
+ruff>=0.4
+mypy>=1.10
+
+[tui]
+textual>=0.60
