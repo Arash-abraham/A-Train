@@ -163,29 +163,29 @@ Cross-cutting behaviours:
 ## 8. Execution Milestones
 
 ### v0.1 — Core
-- [ ] Project scaffolding and `pyproject.toml`
-- [ ] `reader`, `hasher`, and hash-based early exit
-- [ ] Myers over hashed lines with `unified` output
-- [ ] Baseline CLI
-- [ ] Baseline test suite
+- [x] Project scaffolding and `pyproject.toml`
+- [x] `reader`, `hasher`, and hash-based early exit
+- [x] Myers over hashed lines with `unified` output
+- [x] Baseline CLI
+- [x] Baseline test suite
 
 ### v0.2 — Presentation
-- [ ] `color` and `side` output formats
-- [ ] Ignore options (whitespace / case / regex)
-- [ ] Encoding detection and CRLF normalization
-- [ ] `html` and `json` reports
+- [x] `color` and `side` output formats
+- [x] Ignore options (whitespace / case / regex)
+- [x] Encoding detection and CRLF normalization
+- [x] `html` and `json` reports
 
 ### v0.3 — Advanced Modes
-- [ ] `binary` mode
-- [ ] Parallelized `dir` mode
-- [ ] Semantic `json` / `csv` modes
-- [ ] Formal benchmarks against GNU diff and `difflib`
+- [x] `binary` mode
+- [x] Parallelized `dir` mode
+- [x] Semantic `json` / `csv` modes
+- [x] Formal benchmarks against GNU diff and `difflib`
 
 ### v0.4 — Interactive UI and Optimization
-- [ ] Textual-based TUI
-- [ ] Hash cache
-- [ ] Profiling and optimization (py-spy)
-- [ ] Final README with branding assets from `Img/`
+- [x] Textual-based TUI
+- [x] Hash cache
+- [x] Profiling and optimization (py-spy)
+- [x] Final README with branding assets from `Img/`
 
 ---
 
@@ -210,4 +210,4 @@ Cross-cutting behaviours:
 
 ---
 
-*Last updated: 2026-09-11. This is a living document; each milestone is checked off here upon completion.*
+*Last updated: 2026-09-18. This is a living document; each milestone is checked off here upon completion.*
