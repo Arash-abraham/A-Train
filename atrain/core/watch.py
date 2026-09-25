@@ -23,7 +23,7 @@ from typing import Callable
 
 from atrain.core import diff_text
 from atrain.core.diff_text import TextOptions
-from atrain.core.models import DiffResult
+from atrain.core.models import DiffResult, LineTag
 
 
 class WatchMode(Enum):
@@ -82,31 +82,44 @@ class WatchConfig:
     on_alert: Callable[[str, DiffResult], None] | None = None
 
 
+_MODE_LABELS = {"source": "SOURCE", "target": "TARGET", "both": "BOTH"}
+
+
 def _default_alert(label: str, result: DiffResult) -> None:
-    """Print a coloured alert banner to stderr, then the diff to stdout."""
+    """Print only the changed lines with a compact banner."""
     RED = "\x1b[31m"
+    GREEN = "\x1b[32m"
     YELLOW = "\x1b[33m"
     BOLD = "\x1b[1m"
+    DIM = "\x1b[2m"
     RESET = "\x1b[0m"
 
     ts = time.strftime("%H:%M:%S")
-    src_stats = f"+{result.stats.added} -{result.stats.removed}"
-    side = {"source": "SOURCE", "target": "TARGET", "both": "BOTH"}.get(label, label.upper())
+    side = _MODE_LABELS.get(label, label.upper())
     colour = RED if side == "BOTH" else YELLOW
+
+    # Collect only the actual changed lines (no context).
+    added_lines: list[str] = []
+    removed_lines: list[str] = []
+    for hunk in result.hunks:
+        for line in hunk.lines:
+            if line.tag is LineTag.INSERT:
+                added_lines.append(line.text)
+            elif line.tag is LineTag.DELETE:
+                removed_lines.append(line.text)
+
     header = (
         f"{colour}{BOLD}"
-        f"[{ts}] WATCH [{side}] — change detected "
-        f"({src_stats}, {result.stats.hunks} hunk(s))"
-        f"{RESET}"
+        f"[{ts}] [{side}]"
+        f"{RESET} "
+        f"{DIM}+{len(added_lines)} -{len(removed_lines)}{RESET}"
     )
     print(header, file=sys.stderr, flush=True)
 
-    from atrain.output import unified
-
-    diff_text_out = unified.render(result, str(result.source.path), str(result.target.path))
-    if diff_text_out:
-        sys.stdout.write(diff_text_out)
-        sys.stdout.flush()
+    for text in removed_lines:
+        print(f"  {RED}- {text}{RESET}", flush=True)
+    for text in added_lines:
+        print(f"  {GREEN}+ {text}{RESET}", flush=True)
 
 
 def _diff(cfg: WatchConfig) -> DiffResult:
@@ -123,14 +136,8 @@ def watch(cfg: WatchConfig) -> int:
     Returns:
         ``0`` on clean exit, ``2`` on error (missing file, etc.).
 
-    The function polls both files at ``cfg.interval`` seconds.  Depending on
-    ``cfg.mode`` it decides which side's change triggers an alert:
-
-    * ``BOTH`` — either file changed ⇒ alert.
-    * ``SOURCE`` — only source file changed ⇒ alert.
-    * ``TARGET`` — only target file changed ⇒ alert.
-
-    An initial diff is always printed so the user knows the starting state.
+    Prints a "watch started" message, then silently polls.  When a change
+    is detected the alert shows *only* the changed lines — no full diff.
     """
     for label, path in (("source", cfg.source), ("target", cfg.target)):
         if not path.is_file():
@@ -147,13 +154,13 @@ def watch(cfg: WatchConfig) -> int:
         print(f"atrain: watch: {exc}", file=sys.stderr)
         return 2
 
-    # Show the initial diff once so the user has a baseline.
-    initial = _diff(cfg)
-    if not initial.identical:
-        alert(cfg.mode.value, initial)
-    else:
-        ts = time.strftime("%H:%M:%S")
-        print(f"\x1b[2m[{ts}] WATCH — files are identical\x1b[0m", file=sys.stderr, flush=True)
+    side = _MODE_LABELS.get(cfg.mode.value, cfg.mode.value.upper())
+    ts = time.strftime("%H:%M:%S")
+    print(
+        f"\x1b[1m[{ts}] WATCH [{side}]\x1b[0m — watching for changes…",
+        file=sys.stderr,
+        flush=True,
+    )
 
     # Polling loop.
     try:
@@ -168,20 +175,16 @@ def watch(cfg: WatchConfig) -> int:
             state_tgt = _FileState.from_path(cfg.target)
 
             should_alert = False
-            label = cfg.mode.value
 
             if cfg.mode is WatchMode.BOTH:
                 if src_changed or tgt_changed:
                     should_alert = True
-                    label = "both"
             elif cfg.mode is WatchMode.SOURCE:
                 if src_changed:
                     should_alert = True
-                    label = "source"
             elif cfg.mode is WatchMode.TARGET:
                 if tgt_changed:
                     should_alert = True
-                    label = "target"
 
             if not should_alert:
                 continue
@@ -191,7 +194,7 @@ def watch(cfg: WatchConfig) -> int:
                 # A stat change that didn't alter content (e.g. touch).
                 continue
 
-            alert(label, result)
+            alert(cfg.mode.value, result)
 
     except KeyboardInterrupt:
         print("\n\x1b[2m[watch stopped]\x1b[0m", file=sys.stderr, flush=True)

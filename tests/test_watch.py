@@ -114,11 +114,8 @@ class TestWatch:
             on_alert=capture,
         )
 
-        # Run watch in a thread and stop after a short time.
-        done: list[int] = []
-
         def run() -> None:
-            done.append(watch(cfg))
+            watch(cfg)
 
         t = threading.Thread(target=run, daemon=True)
         t.start()
@@ -254,8 +251,8 @@ class TestWatch:
         time.sleep(0.3)
         assert "target" in alerts
 
-    def test_initial_diff_printed_when_files_differ(self, tmp_path: Path) -> None:
-        """The initial diff should be printed immediately when files differ."""
+    def test_no_initial_alert_when_files_differ(self, tmp_path: Path) -> None:
+        """No initial diff is printed — only the watch-started message."""
         src = tmp_path / "a.txt"
         tgt = tmp_path / "b.txt"
         _write(src, "aaa\n")
@@ -279,10 +276,9 @@ class TestWatch:
 
         t = threading.Thread(target=run, daemon=True)
         t.start()
-        time.sleep(0.2)
-        # The initial diff should have been printed already.
-        assert len(alerts) >= 1
-        assert alerts[0] == "both"
+        time.sleep(0.3)
+        # No initial alert should have been fired.
+        assert len(alerts) == 0
 
     def test_content_unchanged_touch_does_not_alert(self, tmp_path: Path) -> None:
         """A stat-only change (same content) should not trigger an alert."""
