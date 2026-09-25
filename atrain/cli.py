@@ -20,6 +20,7 @@ from atrain.core import diff_binary, diff_structured, diff_text, diff_tree
 from atrain.core.diff_text import TextOptions
 from atrain.core.diff_tree import TreeOptions
 from atrain.core.models import DiffResult
+from atrain.core.watch import WatchConfig, WatchMode
 from atrain.output import color, html_report, json_out, side_by_side, unified
 
 EXIT_SAME = 0
@@ -127,6 +128,24 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="FILE",
         help="write output to FILE instead of standard output",
+    )
+    parser.add_argument(
+        "--watch",
+        choices=("both", "source", "target"),
+        default=None,
+        metavar="MODE",
+        help=(
+            "watch mode: monitor files for changes and alert in real-time. "
+            "MODE is 'both' (alert on any change), 'source' (alert when the "
+            "first file changes), or 'target' (alert when the second file changes)."
+        ),
+    )
+    parser.add_argument(
+        "--watch-interval",
+        type=float,
+        default=0.5,
+        metavar="SECONDS",
+        help="polling interval for --watch in seconds (default: 0.5)",
     )
     parser.add_argument(
         "--version", action="version", version=f"atrain {__version__}"
@@ -256,6 +275,24 @@ def _compare_dir(args: argparse.Namespace, source: Path, target: Path) -> int:
     return EXIT_DIFFERENCES if not result.identical else EXIT_SAME
 
 
+def _run_watch(args: argparse.Namespace, source: Path, target: Path) -> int:
+    """Launch a watch session for real-time change monitoring."""
+    from atrain.core.watch import watch as _watch
+
+    if not source.is_file() or not target.is_file():
+        return _fail("--watch compares two files; directory watch is not supported")
+
+    mode = WatchMode(args.watch)
+    cfg = WatchConfig(
+        source=source,
+        target=target,
+        mode=mode,
+        interval=args.watch_interval,
+        text_options=_text_options(args),
+    )
+    return _watch(cfg)
+
+
 def _validate(args: argparse.Namespace, source: Path, target: Path) -> str | None:
     for path in (source, target):
         if not path.exists():
@@ -329,6 +366,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.tui:
         return _run_tui(source, target)
+    if args.watch is not None:
+        return _run_watch(args, source, target)
     if args.cache and args.mode != "dir":
         return _fail("--cache applies to --mode dir only")
 
