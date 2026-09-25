@@ -289,9 +289,38 @@ def _validate(args: argparse.Namespace, source: Path, target: Path) -> str | Non
             return f"invalid regular expression: {exc}"
     return None
 
+_BANNER = (
+    "\n"
+    " █████╗       ████████╗██████╗  █████╗ ██╗███╗   ██╗\n"
+    "██╔══██╗      ╚══██╔══╝██╔══██╗██╔══██╗██║████╗  ██║\n"
+    "███████║█████╗   ██║   ██████╔╝███████║██║██╔██╗ ██║\n"
+    "██╔══██║╚════╝   ██║   ██╔══██╗██╔══██║██║██║╚██╗██║\n"
+    "██║  ██║         ██║   ██║  ██║██║  ██║██║██║ ╚████║\n"
+    "╚═╝  ╚═╝         ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝\n"
+)
 
+
+def _print_banner() -> None:
+    """Print the A-Train banner to stderr when attached to a TTY."""
+    if not sys.stderr.isatty():
+        return
+    try:
+        from colorama import Fore, Style, init as _colorama_init
+        _colorama_init()
+        blue, reset = Fore.BLUE, Style.RESET_ALL
+    except ImportError:
+        blue = reset = ""
+    print(f"{blue}{_BANNER}{reset}", file=sys.stderr, flush=True)
+
+    
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point; returns a process exit code."""
+
+    argv = list(sys.argv[1:] if argv is None else argv)
+
+    if not any(a in ("-h", "--help", "--version", "-v") for a in argv):
+        _print_banner()
+    
     parser = build_parser()
     args = parser.parse_args(argv)
 
