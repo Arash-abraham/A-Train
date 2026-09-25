@@ -79,14 +79,20 @@ class WatchConfig:
     mode: WatchMode = WatchMode.BOTH
     interval: float = 0.5
     text_options: TextOptions | None = None
-    on_alert: Callable[[str, DiffResult], None] | None = None
+    on_alert: Callable[[str, DiffResult, str], None] | None = None
 
 
 _MODE_LABELS = {"source": "SOURCE", "target": "TARGET", "both": "BOTH"}
 
 
-def _default_alert(label: str, result: DiffResult) -> None:
-    """Print only the changed lines with a compact banner."""
+def _default_alert(label: str, result: DiffResult, changed: str = "") -> None:
+    """Print only the changed lines with a compact banner.
+
+    ``changed`` is the side that actually changed (``"source"`` or
+    ``"target"``).  When set, the +/- signs are flipped for the source
+    side so the user sees what was *added to* or *removed from* the
+    file they changed, not raw diff semantics.
+    """
     RED = "\x1b[31m"
     GREEN = "\x1b[32m"
     YELLOW = "\x1b[33m"
@@ -99,14 +105,18 @@ def _default_alert(label: str, result: DiffResult) -> None:
     colour = RED if side == "BOTH" else YELLOW
 
     # Collect only the actual changed lines (no context).
+    # Default mapping: INSERT → +, DELETE → -
+    # When the SOURCE file changed we flip: DELETE → + (new in source),
+    # INSERT → - (missing from source).  TARGET mode keeps the default.
     added_lines: list[str] = []
     removed_lines: list[str] = []
+    flip = changed == "source"
     for hunk in result.hunks:
         for line in hunk.lines:
             if line.tag is LineTag.INSERT:
-                added_lines.append(line.text)
+                (removed_lines if flip else added_lines).append(line.text)
             elif line.tag is LineTag.DELETE:
-                removed_lines.append(line.text)
+                (added_lines if flip else removed_lines).append(line.text)
 
     header = (
         f"{colour}{BOLD}"
@@ -194,7 +204,16 @@ def watch(cfg: WatchConfig) -> int:
                 # A stat change that didn't alter content (e.g. touch).
                 continue
 
-            alert(cfg.mode.value, result)
+            # Determine which file actually changed for sign-flipping.
+            changed = ""
+            if cfg.mode is WatchMode.SOURCE:
+                changed = "source"
+            elif cfg.mode is WatchMode.TARGET:
+                changed = "target"
+            elif cfg.mode is WatchMode.BOTH:
+                changed = "source" if src_changed else "target"
+
+            alert(cfg.mode.value, result, changed)
 
     except KeyboardInterrupt:
         print("\n\x1b[2m[watch stopped]\x1b[0m", file=sys.stderr, flush=True)

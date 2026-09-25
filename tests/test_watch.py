@@ -103,7 +103,7 @@ class TestWatch:
 
         alerts: list[tuple[str, int]] = []
 
-        def capture(label: str, result) -> None:  # type: ignore[no-untyped-def]
+        def capture(label: str, result, changed: str = "") -> None:  # type: ignore[no-untyped-def]
             alerts.append((label, result.stats.added + result.stats.removed))
 
         cfg = WatchConfig(
@@ -131,7 +131,7 @@ class TestWatch:
 
         alerts: list[str] = []
 
-        def capture(label: str, result) -> None:  # type: ignore[no-untyped-def]
+        def capture(label: str, result, changed: str = "") -> None:  # type: ignore[no-untyped-def]
             alerts.append(label)
 
         cfg = WatchConfig(
@@ -160,7 +160,7 @@ class TestWatch:
 
         alerts: list[str] = []
 
-        def capture(label: str, result) -> None:  # type: ignore[no-untyped-def]
+        def capture(label: str, result, changed: str = "") -> None:  # type: ignore[no-untyped-def]
             alerts.append(label)
 
         cfg = WatchConfig(
@@ -189,7 +189,7 @@ class TestWatch:
 
         alerts: list[str] = []
 
-        def capture(label: str, result) -> None:  # type: ignore[no-untyped-def]
+        def capture(label: str, result, changed: str = "") -> None:  # type: ignore[no-untyped-def]
             alerts.append(label)
 
         cfg = WatchConfig(
@@ -224,7 +224,7 @@ class TestWatch:
 
         alerts: list[str] = []
 
-        def capture(label: str, result) -> None:  # type: ignore[no-untyped-def]
+        def capture(label: str, result, changed: str = "") -> None:  # type: ignore[no-untyped-def]
             alerts.append(label)
 
         cfg = WatchConfig(
@@ -260,7 +260,7 @@ class TestWatch:
 
         alerts: list[str] = []
 
-        def capture(label: str, result) -> None:  # type: ignore[no-untyped-def]
+        def capture(label: str, result, changed: str = "") -> None:  # type: ignore[no-untyped-def]
             alerts.append(label)
 
         cfg = WatchConfig(
@@ -289,7 +289,7 @@ class TestWatch:
 
         alerts: list[str] = []
 
-        def capture(label: str, result) -> None:  # type: ignore[no-untyped-def]
+        def capture(label: str, result, changed: str = "") -> None:  # type: ignore[no-untyped-def]
             alerts.append(label)
 
         cfg = WatchConfig(
