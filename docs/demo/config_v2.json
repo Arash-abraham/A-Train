@@ -1,0 +1,7 @@
+{
+  "version": "1.5.0",
+  "service": "orders",
+  "server": { "port": 8443, "host": "0.0.0.0", "workers": 8, "tls": true },
+  "features": { "discounts": true },
+  "regions": ["eu-central-1", "eu-west-1", "us-east-1"]
+}

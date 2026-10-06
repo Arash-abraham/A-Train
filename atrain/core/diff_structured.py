@@ -50,7 +50,9 @@ def _scalar_equal(a: object, b: object) -> bool:
 
 def _walk_json(a: object, b: object, path: str, nodes: list[NodeChange]) -> None:
     if isinstance(a, dict) and isinstance(b, dict):
-        for key in a.keys() | b.keys():
+        # Deterministic order: keys as they appear in *a*, then keys new in *b*.
+        keys = list(a) + [k for k in b if k not in a]
+        for key in keys:
             child = f"{path}.{key}"
             if key not in b:
                 nodes.append(NodeChange(path=child, change="removed", old=_preview(a[key])))

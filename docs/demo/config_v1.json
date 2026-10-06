@@ -1,0 +1,7 @@
+{
+  "service": "orders",
+  "version": "1.4.0",
+  "server": { "host": "0.0.0.0", "port": 8080, "workers": 4 },
+  "features": { "discounts": false, "free_shipping": false },
+  "regions": ["eu-central-1", "eu-west-1"]
+}
