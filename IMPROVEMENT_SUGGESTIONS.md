@@ -115,8 +115,11 @@ Ambiguous inputs (JSON-looking CSV); surprising mode switches in CI.
 ### Priority
 Low.
 
-### Why it is not implemented
-Not in the §8 milestone checklist; explicit `--mode` is more predictable.
+### Status update (2026-10-06, v0.5)
+**Implemented** — `atrain.core.detect.detect_mode`; `--mode auto` is now the
+default. Detection is conservative (both inputs must agree, structured
+formats are confirmed by parsing/sniffing) and the chosen engine is echoed
+on stderr when attached to a TTY. Explicit `--mode` still wins.
 
 ---
 

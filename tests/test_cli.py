@@ -96,7 +96,11 @@ def test_binary_files_message(
     b = tmp_path / "b.bin"
     a.write_bytes(b"same\x00prefix\n then differs A")
     b.write_bytes(b"same\x00prefix\n then differs B")
+    # auto mode routes binary content to the hex engine ...
     assert main([str(a), str(b)]) == EXIT_DIFFERENCES
+    assert capsys.readouterr().out.startswith("@@ binary:")
+    # ... while explicit text mode keeps the GNU diff message
+    assert main(["--mode", "text", str(a), str(b)]) == EXIT_DIFFERENCES
     assert capsys.readouterr().out == f"Binary files {a} and {b} differ\n"
 
 

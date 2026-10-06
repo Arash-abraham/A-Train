@@ -187,6 +187,14 @@ Cross-cutting behaviours:
 - [x] Profiling and optimization (py-spy)
 - [x] Final README with branding assets from `Img/`
 
+### v0.5 — Integration
+- [x] Automatic mode detection (`--mode auto` is the default)
+- [x] Git integration: `--git REV[..REV2]`, `diff.external` driver, `--git-setup`
+- [x] GitHub Actions CI (tests on 3 OSes × 4 Pythons, ruff, mypy, benchmark smoke)
+- [ ] Similarity-based JSON array matching
+- [ ] Syntax highlighting (optional `pygments` extra)
+- [ ] `atrain.toml` per-project configuration
+
 ---
 
 ## 9. Branding and Repository Hygiene

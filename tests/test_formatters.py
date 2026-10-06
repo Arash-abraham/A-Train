@@ -101,7 +101,8 @@ def test_html_self_contained_and_escaped(tmp_path: Path) -> None:
     assert text.startswith("<!DOCTYPE html>")
     assert "<script>alert" not in text  # escaped (may sit inside <mark>)
     assert "alert" in text  # the content is still shown, just escaped
-    assert "http://" not in text and "https://" not in text  # no external refs
+    # self-contained: no external scripts/styles (plain hyperlinks are fine)
+    assert "<script src" not in text and "<link " not in text
     assert 'class="del"' in text and 'class="ins"' in text
 
 

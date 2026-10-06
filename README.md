@@ -1,5 +1,7 @@
 # A-Train
 
+[![CI](https://github.com/Arash-abraham/A-Train/actions/workflows/ci.yml/badge.svg)](https://github.com/Arash-abraham/A-Train/actions/workflows/ci.yml)
+
 <p align="center">
   <img src="Img/a_train_hd_the_boys-1920x1080.jpg" alt="A-Train — The Boys" width="720">
 </p>
@@ -45,13 +47,18 @@ pip install -e .                 # or install the `atrain` console script
 pip install textual              # optional: interactive TUI
 ```
 
-Requires Python 3.11+.
+Requires Python 3.10+.
 
 ## Usage
 
 ```bash
-# Basic comparison (auto text diff, patch-compatible)
+# Basic comparison (patch-compatible unified diff)
 python -m atrain baseline.txt candidate.txt
+
+# No --mode needed: directories, .json/.csv and binary content are detected
+atrain config_v1.json config_v2.json        # → semantic JSON diff
+atrain ./release-1.0 ./release-2.0          # → tree diff
+atrain firmware_v1.bin firmware_v2.bin      # → hex change regions
 
 # Colored terminal output, ignoring whitespace differences
 atrain a.py b.py --format color --ignore-space
@@ -76,6 +83,21 @@ atrain a.txt b.txt --ignore-case --ignore-matching '^#' --strip-trailing-cr
 
 # Interactive TUI (needs `pip install textual` and a real terminal)
 atrain a.py b.py --tui
+
+# Git: compare a file against history, or between two revisions
+atrain --git HEAD~1 src/app.py
+atrain --git v1.0..v2.0 config.json --format side
+```
+
+### Git integration
+
+A-Train speaks Git's external-diff protocol, so it can replace `git diff` output
+entirely or be used on demand:
+
+```bash
+git config diff.external atrain          # every `git diff` goes through A-Train
+git difftool -x atrain                   # on demand, without changing config
+atrain --git-setup                       # prints all the snippets above
 ```
 
 Exit codes: `0` no differences · `1` differences found · `2` error (bad input, malformed
