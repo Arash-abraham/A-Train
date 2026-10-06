@@ -42,6 +42,8 @@ class ExternalDiffCall:
     """The arguments Git hands to an external diff program."""
 
     path: str
+    options: tuple[str, ...]
+    """CLI options that preceded Git's arguments (``diff.external "atrain --format side"``)."""
     old_file: Path | None
     old_hex: str
     old_mode: str
@@ -73,16 +75,32 @@ def parse_external_diff_argv(
     ordinary seven-argument invocation.
     """
     env = os.environ if environ is None else environ
-    if len(argv) not in (7, 9) or not all(k in env for k in _EXTERNAL_DIFF_ENV):
+    if not all(k in env for k in _EXTERNAL_DIFF_ENV):
         return None
-    path, old_file, old_hex, old_mode, new_file, new_hex, new_mode = argv[:7]
-    extra = argv[7:]
+    # Options configured alongside the command (``atrain --format side``) arrive
+    # *before* Git's own arguments; find where Git's block starts.
+    start = next(
+        (
+            i
+            for i in range(len(argv))
+            if len(argv) - i in (7, 9)
+            and _looks_like_mode(argv[i + 3])
+            and _looks_like_mode(argv[i + 6])
+        ),
+        None,
+    )
+    if start is None:
+        return None
+    options = tuple(argv[:start])
+    path, old_file, old_hex, old_mode, new_file, new_hex, new_mode = argv[start : start + 7]
+    extra = argv[start + 7 :]
 
     def _p(raw: str) -> Path | None:
         return None if raw == _NULL_PATH else Path(raw)
 
     return ExternalDiffCall(
         path=path,
+        options=options,
         old_file=_p(old_file),
         old_hex=old_hex,
         old_mode=old_mode,
@@ -92,6 +110,11 @@ def parse_external_diff_argv(
         new_path=extra[0] if extra else None,
         similarity=extra[1] if extra else None,
     )
+
+
+def _looks_like_mode(raw: str) -> bool:
+    """Git file modes are six octal digits (``100644``) or ``.`` when absent."""
+    return raw == "." or (len(raw) == 6 and all(c in "01234567" for c in raw))
 
 
 # ---------------------------------------------------------------- revisions

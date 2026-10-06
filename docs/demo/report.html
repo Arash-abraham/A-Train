@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="A-Train 0.5.0">
+<title>A-Train · app_v1.py ↔ app_v2.py</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f6f8fa; --surface: #ffffff; --surface-2: #f6f8fa; --border: #d0d7de;
+  --text: #1f2328; --muted: #59636e; --accent: #0969da; --accent-soft: #ddf4ff;
+  --add-bg: #e6ffec; --add-ln: #ccffd8; --add-mark: #abf2bc; --add-fg: #1a7f37;
+  --del-bg: #ffebe9; --del-ln: #ffd7d5; --del-mark: #ff818266; --del-fg: #cf222e;
+  --chg-bg: #fff8c5; --chg-fg: #9a6700;
+  --hunk-bg: #ddf4ff; --hunk-fg: #0550ae;
+  --shadow: 0 1px 3px rgba(31, 35, 40, .08), 0 1px 0 rgba(31, 35, 40, .04);
+  --radius: 10px;
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, "DejaVu Sans Mono", monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial,
+          sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117; --surface: #151b23; --surface-2: #0d1117; --border: #30363d;
+    --text: #e6edf3; --muted: #9198a1; --accent: #4493f8; --accent-soft: #121d2f;
+    --add-bg: #12261e; --add-ln: #1b4721; --add-mark: #2ea04366; --add-fg: #3fb950;
+    --del-bg: #25171c; --del-ln: #542426; --del-mark: #f8514966; --del-fg: #f85149;
+    --chg-bg: #2e2a1a; --chg-fg: #d29922;
+    --hunk-bg: #121d2f; --hunk-fg: #79c0ff;
+    --shadow: 0 0 0 1px rgba(240, 246, 252, .03);
+  }
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; padding: 2rem 1.25rem 3rem; color: var(--text); background: var(--bg);
+       font: 14px/1.5 var(--sans); }
+.wrap { max-width: 78rem; margin: 0 auto; }
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+h2 { font-size: 1rem; margin: 2rem 0 .75rem; display: flex; align-items: center; gap: .5rem; }
+h2 .count { font-weight: 500; color: var(--muted); font-size: .85rem; }
+
+/* ---- header ---- */
+.hero { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+        gap: 1rem; margin-bottom: 1.5rem; }
+.brand { display: flex; align-items: center; gap: .85rem; }
+.logo { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+        background: linear-gradient(135deg, #0969da, #8250df); color: #fff;
+        font-weight: 800; font-size: 1.1rem; letter-spacing: -.5px;
+        box-shadow: 0 4px 14px rgba(9, 105, 218, .35); }
+.brand h1 { margin: 0; font-size: 1.35rem; line-height: 1.2; }
+.brand .sub { color: var(--muted); font-size: .85rem; }
+.files { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-top: .3rem; }
+.files code { background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+              padding: .1rem .45rem; overflow-wrap: anywhere; }
+.files .arrow { color: var(--muted); }
+.pill { display: inline-flex; align-items: center; gap: .4rem; border-radius: 999px;
+        padding: .3rem .8rem; font-weight: 600; font-size: .85rem; border: 1px solid; }
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.pill.same { color: var(--add-fg); background: var(--add-bg); border-color: var(--add-fg); }
+.pill.diff { color: var(--chg-fg); background: var(--chg-bg); border-color: var(--chg-fg); }
+.pill.err { color: var(--del-fg); background: var(--del-bg); border-color: var(--del-fg); }
+.tags { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.tag-mode { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em;
+            color: var(--accent); background: var(--accent-soft); border-radius: 6px;
+            padding: .2rem .55rem; font-weight: 700; }
+
+/* ---- cards ---- */
+.card { background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); box-shadow: var(--shadow); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+         gap: .75rem; }
+.stat { padding: .9rem 1.1rem; }
+.stat .label { color: var(--muted); font-size: .75rem; text-transform: uppercase;
+               letter-spacing: .06em; font-weight: 600; }
+.stat .value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; margin-top: .15rem;
+               font-variant-numeric: tabular-nums; }
+.stat.add .value { color: var(--add-fg); } .stat.del .value { color: var(--del-fg); }
+.stat.chg .value { color: var(--chg-fg); }
+.bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden;
+       background: var(--surface-2); border: 1px solid var(--border); margin-top: .75rem; }
+.bar .a { background: var(--add-fg); } .bar .d { background: var(--del-fg); }
+
+.meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+        gap: .75rem; margin-top: .75rem; }
+.meta .card { padding: .9rem 1.1rem; }
+.meta .role { display: flex; align-items: center; gap: .5rem; font-weight: 700;
+              margin-bottom: .5rem; }
+.meta .role .sign { width: 22px; height: 22px; border-radius: 6px; display: grid;
+                    place-items: center; font-family: var(--mono); font-weight: 700; }
+.meta .src .sign { background: var(--del-bg); color: var(--del-fg); }
+.meta .dst .sign { background: var(--add-bg); color: var(--add-fg); }
+.meta .path { overflow-wrap: anywhere; font-weight: 400; }
+dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; margin: 0; }
+dl.kv dt { color: var(--muted); }
+dl.kv dd { margin: 0; overflow-wrap: anywhere; }
+.chip { display: inline-block; border-radius: 6px; padding: 0 .4rem; font-size: .8rem;
+        background: var(--surface-2); border: 1px solid var(--border); }
+
+/* ---- notices ---- */
+.notice { display: flex; gap: .75rem; align-items: flex-start; padding: 1rem 1.1rem;
+          border-radius: var(--radius); border: 1px solid; margin-top: 1rem; }
+.notice .icon { font-weight: 800; font-size: 1.1rem; line-height: 1.3; }
+.notice.ok { background: var(--add-bg); border-color: var(--add-fg); color: var(--text); }
+.notice.ok .icon { color: var(--add-fg); }
+.notice.info { background: var(--chg-bg); border-color: var(--chg-fg); }
+.notice.info .icon { color: var(--chg-fg); }
+.notice.error { background: var(--del-bg); border-color: var(--del-fg); }
+.notice.error .icon { color: var(--del-fg); }
+.notice ul { margin: .25rem 0 0; padding-left: 1.1rem; }
+
+/* ---- diff tables ---- */
+.file { overflow: hidden; margin-bottom: 1rem; }
+.file-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+             padding: .6rem 1rem; background: var(--surface-2);
+             border-bottom: 1px solid var(--border); }
+.file-head .name { font-weight: 600; overflow-wrap: anywhere; }
+.file-head .mini { color: var(--muted); font-size: .8rem; white-space: nowrap; }
+.mini .a { color: var(--add-fg); font-weight: 600; }
+.mini .d { color: var(--del-fg); font-weight: 600; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+table.diff { font-family: var(--mono); font-size: 12.5px; line-height: 20px;
+             table-layout: fixed; }
+table.diff col.ln { width: 4.2em; } table.diff col.sg { width: 1.6em; }
+table.diff td { padding: 0 .5rem; vertical-align: top; border: 0; }
+td.ln { text-align: right; color: var(--muted); user-select: none; opacity: .85; }
+td.sg { text-align: center; user-select: none; color: var(--muted); padding: 0; }
+td.text { white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; }
+tr.del td { background: var(--del-bg); } tr.del td.ln { background: var(--del-ln); }
+tr.ins td { background: var(--add-bg); } tr.ins td.ln { background: var(--add-ln); }
+tr.del td.sg { color: var(--del-fg); } tr.ins td.sg { color: var(--add-fg); }
+tr.hunk td { background: var(--hunk-bg); color: var(--hunk-fg); padding: .25rem .75rem; }
+tr.hunk + tr td { padding-top: 2px; }
+tr.gap td { height: .5rem; background: var(--surface-2); }
+tr.eof td.text { color: var(--muted); font-style: italic; }
+mark { color: inherit; border-radius: 3px; padding: 0 1px; }
+tr.del mark { background: var(--del-mark); } tr.ins mark { background: var(--add-mark); }
+.empty { color: var(--muted); }
+
+/* ---- generic data tables (binary / structured / dir) ---- */
+table.grid { font-size: 13px; }
+table.grid th { text-align: left; font-weight: 600; color: var(--muted); font-size: .75rem;
+                text-transform: uppercase; letter-spacing: .05em; padding: .55rem .9rem;
+                background: var(--surface-2); border-bottom: 1px solid var(--border); }
+table.grid td { padding: .45rem .9rem; border-bottom: 1px solid var(--border);
+                vertical-align: top; }
+table.grid tr:last-child td { border-bottom: 0; }
+table.grid td.text { font-family: var(--mono); font-size: 12.5px; }
+table.grid td.old { color: var(--del-fg); } table.grid td.new { color: var(--add-fg); }
+.badge { display: inline-block; min-width: 5.5rem; text-align: center; border-radius: 999px;
+         padding: .05rem .6rem; font-size: .75rem; font-weight: 600; border: 1px solid; }
+.badge.ins { color: var(--add-fg); background: var(--add-bg); border-color: var(--add-fg); }
+.badge.del { color: var(--del-fg); background: var(--del-bg); border-color: var(--del-fg); }
+.badge.chg { color: var(--chg-fg); background: var(--chg-bg); border-color: var(--chg-fg); }
+.badge.same { color: var(--muted); background: var(--surface-2); border-color: var(--border); }
+tr.same td { color: var(--muted); }
+
+details.file > summary { list-style: none; cursor: pointer; }
+details.file > summary::-webkit-details-marker { display: none; }
+details.file > summary .name::before { content: "\25B8"; display: inline-block;
+  margin-right: .5rem; color: var(--muted); transition: transform .15s; }
+details.file[open] > summary .name::before { transform: rotate(90deg); }
+details.file:not([open]) > summary { border-bottom: 0; }
+
+/* ---- footer ---- */
+footer.site-footer {
+  margin-top: 3rem;
+  padding: 1.25rem 1rem 0;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .8rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+footer.site-footer .footer-line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: .35rem;
+}
+footer.site-footer .footer-line code {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 .3rem;
+  font-size: .75rem;
+}
+footer.site-footer .footer-author {
+  font-size: .82rem;
+}
+footer.site-footer .footer-author a {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1px solid transparent;
+  transition: border-color .15s, color .15s;
+}
+footer.site-footer .footer-author a:hover {
+  border-bottom-color: var(--accent);
+}
+footer.site-footer .sep {
+  color: var(--border);
+}
+
+@media print {
+  body { background: #fff; padding: 0; }
+  .card { box-shadow: none; }
+  .file { break-inside: avoid-page; }
+  details.file > summary .name::before { display: none; }
+  footer.site-footer { border-top: 1px solid #ccc; color: #555; }
+  footer.site-footer .footer-author a { color: #555; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero"><div class="brand"><div class="logo">A</div><div><h1>A-Train comparison report</h1><div class="files"><code>app_v1.py</code><span class="arrow">→</span><code>app_v2.py</code></div></div></div><div class="tags"><span class="tag-mode">text</span><span class="pill diff"><span class="dot"></span>Differences found</span></div></header>
+<div class="stats"><div class="card stat add"><div class="label">Lines added</div><div class="value">+10</div></div><div class="card stat del"><div class="label">Lines removed</div><div class="value">-3</div></div><div class="card stat "><div class="label">Hunks</div><div class="value">2</div></div></div><div class="bar" role="img" aria-label="10 added, 3 removed"><span class="a" style="width:76.92%"></span><span class="d" style="width:23.08%"></span></div>
+<div class="meta"><div class="card src"><div class="role"><span class="sign">−</span>Source <code class="path">app_v1.py</code></div><dl class="kv"><dt>Size</dt><dd>453 bytes</dd><dt>Type</dt><dd><span class="chip">text</span></dd><dt>Encoding</dt><dd><span class="chip">utf-8</span></dd><dt>Newlines</dt><dd><span class="chip">LF</span></dd><dt>BLAKE2b-128</dt><dd><code>649f46c6f7bf22d6e04156292d86e34a</code></dd></dl></div><div class="card dst"><div class="role"><span class="sign">+</span>Target <code class="path">app_v2.py</code></div><dl class="kv"><dt>Size</dt><dd>675 bytes</dd><dt>Type</dt><dd><span class="chip">text</span></dd><dt>Encoding</dt><dd><span class="chip">utf-8</span></dd><dt>Newlines</dt><dd><span class="chip">LF</span></dd><dt>BLAKE2b-128</dt><dd><code>fbe2264e388eb00ecc9a03aeb60234b5</code></dd></dl></div></div>
+<h2>Changes <span class="count">2 hunks</span></h2>
+<section class="card file"><div class="file-head"><span class="name"><code>app_v2.py</code></span><span class="mini"><span class="a">+10</span> <span class="d">−3</span> · 2 hunks</span></div><div class="scroll"><table class="diff"><colgroup><col class="ln"><col class="ln"><col class="sg"><col></colgroup>
+<tr class="hunk"><td colspan="4">@@ -3,6 +3,7 @@</td></tr>
+<tr class="ctx"><td class="ln">3</td><td class="ln">3</td><td class="sg"> </td><td class="text">from dataclasses import dataclass</td></tr>
+<tr class="ctx"><td class="ln">4</td><td class="ln">4</td><td class="sg"> </td><td class="text"> </td></tr>
+<tr class="ctx"><td class="ln">5</td><td class="ln">5</td><td class="sg"> </td><td class="text">TAX_RATE = 0.19</td></tr>
+<tr class="ins"><td class="ln"></td><td class="ln">6</td><td class="sg">+</td><td class="text">FREE_SHIPPING_ABOVE = 50.0</td></tr>
+<tr class="ctx"><td class="ln">6</td><td class="ln">7</td><td class="sg"> </td><td class="text"> </td></tr>
+<tr class="ctx"><td class="ln">7</td><td class="ln">8</td><td class="sg"> </td><td class="text"> </td></tr>
+<tr class="ctx"><td class="ln">8</td><td class="ln">9</td><td class="sg"> </td><td class="text">@dataclass</td></tr>
+<tr class="gap"><td colspan="4"></td></tr>
+<tr class="hunk"><td colspan="4">@@ -10,16 +11,22 @@</td></tr>
+<tr class="ctx"><td class="ln">10</td><td class="ln">11</td><td class="sg"> </td><td class="text">    sku: str</td></tr>
+<tr class="ctx"><td class="ln">11</td><td class="ln">12</td><td class="sg"> </td><td class="text">    quantity: int</td></tr>
+<tr class="ctx"><td class="ln">12</td><td class="ln">13</td><td class="sg"> </td><td class="text">    unit_price: float</td></tr>
+<tr class="ins"><td class="ln"></td><td class="ln">14</td><td class="sg">+</td><td class="text">    discount: float = 0.0</td></tr>
+<tr class="ctx"><td class="ln">13</td><td class="ln">15</td><td class="sg"> </td><td class="text"> </td></tr>
+<tr class="ctx"><td class="ln">14</td><td class="ln">16</td><td class="sg"> </td><td class="text"> </td></tr>
+<tr class="ctx"><td class="ln">15</td><td class="ln">17</td><td class="sg"> </td><td class="text">def subtotal(order: Order) -&gt; float:</td></tr>
+<tr class="ins"><td class="ln"></td><td class="ln">18</td><td class="sg">+</td><td class="text">    gross = order.quantity * order.unit_price</td></tr>
+<tr class="ins"><td class="ln"></td><td class="ln">19</td><td class="sg">+</td><td class="text">    return gross * (1 - order.discount)</td></tr>
+<tr class="del"><td class="ln">16</td><td class="ln"></td><td class="sg">−</td><td class="text"><mark>    return order.quantity * order.unit_price</mark></td></tr>
+<tr class="ins"><td class="ln"></td><td class="ln">20</td><td class="sg">+</td><td class="text"> </td></tr>
+<tr class="ins"><td class="ln"></td><td class="ln">21</td><td class="sg">+</td><td class="text"> </td></tr>
+<tr class="ins"><td class="ln"></td><td class="ln">22</td><td class="sg">+</td><td class="text">def shipping(order: Order) -&gt; float:</td></tr>
+<tr class="ins"><td class="ln"></td><td class="ln">23</td><td class="sg">+</td><td class="text">    return 0.0 if subtotal(order) &gt;= FREE_SHIPPING_ABOVE else 4.90</td></tr>
+<tr class="ctx"><td class="ln">17</td><td class="ln">24</td><td class="sg"> </td><td class="text"> </td></tr>
+<tr class="ctx"><td class="ln">18</td><td class="ln">25</td><td class="sg"> </td><td class="text"> </td></tr>
+<tr class="ctx"><td class="ln">19</td><td class="ln">26</td><td class="sg"> </td><td class="text">def total(order: Order) -&gt; float:</td></tr>
+<tr class="ctx"><td class="ln">20</td><td class="ln">27</td><td class="sg"> </td><td class="text">    net = subtotal(order)</td></tr>
+<tr class="del"><td class="ln">21</td><td class="ln"></td><td class="sg">−</td><td class="text">    return net + net * TAX_RATE</td></tr>
+<tr class="ins"><td class="ln"></td><td class="ln">28</td><td class="sg">+</td><td class="text">    return net + net * TAX_RATE<mark> + shipping(order)</mark></td></tr>
+<tr class="ctx"><td class="ln">22</td><td class="ln">29</td><td class="sg"> </td><td class="text"> </td></tr>
+<tr class="ctx"><td class="ln">23</td><td class="ln">30</td><td class="sg"> </td><td class="text"> </td></tr>
+<tr class="ctx"><td class="ln">24</td><td class="ln">31</td><td class="sg"> </td><td class="text">def describe(order: Order) -&gt; str:</td></tr>
+<tr class="del"><td class="ln">25</td><td class="ln"></td><td class="sg">−</td><td class="text">    return f&quot;{order.quantity} x {order.sku} = {total(order):.2f}&quot;</td></tr>
+<tr class="ins"><td class="ln"></td><td class="ln">32</td><td class="sg">+</td><td class="text">    return f&quot;{order.quantity} x {order.sku} = {total(order):.2f}<mark> EUR</mark>&quot;</td></tr>
+</table></div></section>
+<footer class="site-footer"><div class="footer-line">Generated by <strong>A-Train</strong> <code>0.5.0</code> · self-contained report, no external resources</div><div class="footer-line footer-author">Made by <a href="https://github.com/Arash-abraham" target="_blank" rel="noopener noreferrer"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> Arash-abraham</a><span class="sep">·</span><a href="https://t.me/Octawian" target="_blank" rel="noopener noreferrer"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg> Telegram</a></div></footer>
+</div>
+</body>
+</html>

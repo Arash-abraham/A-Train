@@ -436,9 +436,10 @@ def _run_git_revisions(args: argparse.Namespace) -> int:
 
 def _run_git_external(call: ExternalDiffCall) -> int:
     """Act as ``diff.external``: Git supplies both files and expects exit 0."""
-    args = build_parser().parse_args([call.path])  # defaults; paths come from Git
-    args.format = "color"
-    args.color = "auto"
+    parser = build_parser()
+    args = parser.parse_args([*call.options, call.path])  # paths come from Git
+    if "--format" not in call.options:
+        args.format = "color"
     args._labels = (call.old_label, call.new_label)
     empty: Path | None = None
     try:

@@ -113,6 +113,15 @@ def test_parse_external_diff_argv_requires_git_env() -> None:
     assert parse_external_diff_argv(argv[:6], {"GIT_DIFF_PATH_COUNTER": "1"}) is None
 
 
+def test_parse_external_diff_argv_with_leading_options() -> None:
+    env = {"GIT_DIFF_PATH_COUNTER": "1", "GIT_DIFF_PATH_TOTAL": "1"}
+    argv = ["--format", "side", "p", "/tmp/o", "0" * 40, "100644", "/tmp/n", "1" * 40, "100644"]
+    call = parse_external_diff_argv(argv, env)
+    assert call is not None
+    assert call.options == ("--format", "side") and call.path == "p"
+    assert call.new_path is None
+
+
 def test_parse_external_diff_argv_handles_null_and_rename() -> None:
     env = {"GIT_DIFF_PATH_COUNTER": "1", "GIT_DIFF_PATH_TOTAL": "1"}
     call = parse_external_diff_argv(
@@ -202,3 +211,12 @@ def test_external_diff_driver_end_to_end(repo: Path) -> None:
     assert proc.returncode == 0, proc.stderr
     assert "diff --atrain a/f.txt b/f.txt" in proc.stdout
     assert "TWO" in proc.stdout
+
+
+def test_json_change_order_is_deterministic() -> None:
+    from atrain.core.diff_structured import diff_json_strings
+
+    a = '{"z": 1, "m": {"q": 1, "b": 2}, "a": [1]}'
+    b = '{"a": [1, 2], "m": {"b": 3, "q": 1, "new": 0}, "k": 9}'
+    paths = [n.path for n in diff_json_strings(a, b, "a", "b").nodes]
+    assert paths == ["$.z", "$.m.b", "$.m.new", "$.a[1]", "$.k"]

@@ -66,20 +66,19 @@ atrain a.py b.py --format color --ignore-space
 # Side-by-side view, HTML report, machine-readable JSON
 atrain a.py b.py --format side
 atrain a.py b.py --format html -o report.html
-atrain old.json new.json --mode json --format json > report.json
+atrain old.json new.json --format json > report.json
 
-# Binary files: change regions with hex dumps
-atrain firmware_v1.bin firmware_v2.bin --mode binary
-
-# Semantic JSON and CSV comparison
-atrain config_v1.json config_v2.json --mode json
-atrain sales_jan.csv sales_feb.csv --mode csv --key-col order_id
+# Semantic CSV comparison keyed on a column
+atrain sales_jan.csv sales_feb.csv --key-col order_id
 
 # Directory trees, parallel with 4 workers, digest cache across runs
-atrain ./release-1.0 ./release-2.0 --mode dir --workers 4 --cache
+atrain ./release-1.0 ./release-2.0 --workers 4 --cache
 
 # Ignore options (GNU diff compatible)
 atrain a.txt b.txt --ignore-case --ignore-matching '^#' --strip-trailing-cr
+
+# Watch two files and get a live alert on every change
+atrain --watch both service.yaml service.local.yaml
 
 # Interactive TUI (needs `pip install textual` and a real terminal)
 atrain a.py b.py --tui
@@ -89,16 +88,97 @@ atrain --git HEAD~1 src/app.py
 atrain --git v1.0..v2.0 config.json --format side
 ```
 
+## Tour
+
+Every screenshot below is generated from real runs against the fixtures in
+[`docs/demo/`](./docs/demo/) by [`docs/screenshots/make_screenshots.py`](./docs/screenshots/make_screenshots.py)
+— rerun it after any change to the formatters and the images stay honest.
+
+### The command line
+
+`atrain --help` — all options at a glance. Exit codes follow GNU diff (`0` same, `1`
+different, `2` trouble).
+
+<p align="center"><img src="Img/screenshots/help.png" alt="atrain --help" width="760"></p>
+
+### Text diff, three ways
+
+**Colored output** with dual line numbers and intra-line word highlighting (bold marks the
+exact tokens that changed):
+
+<p align="center"><img src="Img/screenshots/text-color.png" alt="colored text diff" width="820"></p>
+
+**Unified** — the default; byte-for-byte compatible with `patch -p0` and `git apply`:
+
+<p align="center"><img src="Img/screenshots/text-unified.png" alt="unified diff" width="820"></p>
+
+**Side by side** — `--format side`, width follows the terminal or `--width`:
+
+<p align="center"><img src="Img/screenshots/text-side.png" alt="side-by-side diff" width="960"></p>
+
+### Auto-detected modes: JSON, CSV, binary
+
+No flags. `.json` files are parsed and compared semantically (key order is irrelevant,
+changes are reported as JSONPath), `.csv` rows are matched on `--key-col`, and anything
+with NUL bytes gets the hex engine:
+
+<p align="center"><img src="Img/screenshots/auto-modes.png" alt="JSON, CSV and binary comparison" width="880"></p>
+
+### Directory trees
+
+Added / removed / modified files first, then a per-file diff for every modified pair.
+Files are hashed in parallel; `--cache` remembers digests between runs:
+
+<p align="center"><img src="Img/screenshots/dir-mode.png" alt="directory comparison" width="840"></p>
+
+### Ignore options
+
+`--ignore-case`, `--ignore-space`, `--ignore-matching REGEX` and `--strip-trailing-cr`
+behave like their GNU diff counterparts — here the same two files go from "different" to
+"identical, exit 0":
+
+<p align="center"><img src="Img/screenshots/ignore-options.png" alt="ignore options" width="760"></p>
+
 ### Git integration
 
-A-Train speaks Git's external-diff protocol, so it can replace `git diff` output
-entirely or be used on demand:
+`--git REV PATH` compares a file in history with the working tree; `--git A..B PATH`
+compares two revisions. Mode auto-detection still applies — the JSON file below gets a
+semantic diff straight out of `git show`:
+
+<p align="center"><img src="Img/screenshots/git-revisions.png" alt="atrain --git" width="800"></p>
+
+A-Train also speaks Git's external-diff protocol. One config line and every `git diff`
+(including `git log -p`, `git show`, …) renders through A-Train:
 
 ```bash
-git config diff.external atrain          # every `git diff` goes through A-Train
-git difftool -x atrain                   # on demand, without changing config
-atrain --git-setup                       # prints all the snippets above
+git config diff.external atrain                  # or: "atrain --format side"
+git difftool -x atrain                           # on demand, no config change
+atrain --git-setup                               # prints all the snippets
 ```
+
+<p align="center"><img src="Img/screenshots/git-external.png" alt="git diff via A-Train" width="800"></p>
+
+### Watch mode
+
+`--watch both|source|target` polls the two files and prints a timestamped alert with the
+delta each time one of them changes — handy while hand-editing generated configs:
+
+<p align="center"><img src="Img/screenshots/watch-mode.png" alt="watch mode" width="760"></p>
+
+### Interactive TUI
+
+`atrain a b --tui` opens a Textual viewer: synchronized single-stream scrolling,
+`n`/`p` jump between hunks, `r` reloads the files, `q` quits.
+
+<p align="center"><img src="Img/screenshots/tui.svg" alt="interactive TUI" width="900"></p>
+
+### Machine-readable JSON and HTML reports
+
+`--format json` emits a stable nested document for CI consumption; `--format html` writes a
+self-contained report (no external assets) — open
+[`docs/demo/report.html`](./docs/demo/report.html) for a sample.
+
+<p align="center"><img src="Img/screenshots/json-output.png" alt="JSON output" width="820"></p>
 
 Exit codes: `0` no differences · `1` differences found · `2` error (bad input, malformed
 JSON/CSV, unknown key column, …) — CI-friendly.
@@ -181,7 +261,9 @@ development live under `test/NN_regression/` style folders.
 | `benchmarks/` | Benchmark harness + measured results |
 | `tests/` | Official test suite |
 | `test/` | Exploratory test labs, profilers, and reports |
-| `Img/` | Branding assets |
+| `docs/demo/` | Fixture files used by the README tour |
+| `docs/screenshots/` | Screenshot generator (`make_screenshots.py`) |
+| `Img/` | Branding assets and generated screenshots |
 
 ## Branding
 
