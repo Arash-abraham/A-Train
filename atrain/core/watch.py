@@ -13,13 +13,12 @@ dependencies are required.
 
 from __future__ import annotations
 
-import os
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Callable
 
 from atrain.core import diff_text
 from atrain.core.diff_text import TextOptions

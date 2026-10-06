@@ -1,0 +1,5 @@
+order_id,customer,sku,quantity,total
+1001,alice,KB-01,1,49.90
+1003,carol,HD-12,2,258.00
+1004,dave,KB-01,3,149.70
+1005,erin,MS-77,1,19.90

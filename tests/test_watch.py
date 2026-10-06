@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import tempfile
 import threading
 import time
 from pathlib import Path
 
-import pytest
-
-from atrain.core.diff_text import TextOptions
 from atrain.core.watch import WatchConfig, WatchMode, _FileState, watch
-
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
