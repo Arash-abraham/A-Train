@@ -12,15 +12,24 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
 from atrain import __version__
 from atrain.core import diff_binary, diff_structured, diff_text, diff_tree
+from atrain.core.detect import detect_mode
 from atrain.core.diff_text import TextOptions
 from atrain.core.diff_tree import TreeOptions
 from atrain.core.models import DiffResult
 from atrain.core.watch import WatchConfig, WatchMode
+from atrain.gitsupport import (
+    SETUP_SNIPPET,
+    ExternalDiffCall,
+    GitError,
+    materialise,
+    parse_external_diff_argv,
+)
 from atrain.output import color, html_report, json_out, side_by_side, unified
 
 EXIT_SAME = 0
@@ -37,12 +46,34 @@ def build_parser() -> argparse.ArgumentParser:
         description="A-Train — a high-performance file comparison tool.",
     )
     parser.add_argument("source", help="first file or directory")
-    parser.add_argument("target", help="second file or directory")
+    parser.add_argument(
+        "target",
+        nargs="?",
+        default=None,
+        help="second file or directory (omit with --git to use the working tree)",
+    )
     parser.add_argument(
         "--mode",
-        choices=("text", "binary", "json", "csv", "dir"),
-        default="text",
-        help="comparison mode (default: text)",
+        choices=("auto", "text", "binary", "json", "csv", "dir"),
+        default="auto",
+        help=(
+            "comparison mode (default: auto — directories, .json/.csv and "
+            "binary content are detected from the inputs)"
+        ),
+    )
+    parser.add_argument(
+        "--git",
+        default=None,
+        metavar="REV[..REV2]",
+        help=(
+            "compare SOURCE as stored at REV with the working tree, or at "
+            "REV with REV2 (e.g. --git HEAD~1, --git v1.0..v2.0)"
+        ),
+    )
+    parser.add_argument(
+        "--git-setup",
+        action="store_true",
+        help="print the git config snippets for using A-Train as diff driver and exit",
     )
     parser.add_argument(
         "--format",
@@ -191,7 +222,8 @@ def _use_color(args: argparse.Namespace) -> bool:
 
 
 def _render(result: DiffResult, args: argparse.Namespace, source: Path, target: Path) -> str:
-    a_label, b_label = str(source), str(target)
+    labels: tuple[str, str] | None = getattr(args, "_labels", None)
+    a_label, b_label = labels if labels else (str(source), str(target))
     if args.format == "unified":
         return unified.render(result, a_label, b_label)
     if args.format == "color":
@@ -293,6 +325,15 @@ def _run_watch(args: argparse.Namespace, source: Path, target: Path) -> int:
     return _watch(cfg)
 
 
+def _resolve_mode(args: argparse.Namespace, source: Path, target: Path) -> None:
+    """Replace ``--mode auto`` with a concrete engine chosen from the inputs."""
+    if args.mode != "auto":
+        return
+    args.mode = detect_mode(source, target, args.encoding)
+    if args.mode != "text" and sys.stderr.isatty():
+        print(f"atrain: auto-detected mode: {args.mode}", file=sys.stderr)
+
+
 def _validate(args: argparse.Namespace, source: Path, target: Path) -> str | None:
     for path in (source, target):
         if not path.exists():
@@ -342,32 +383,94 @@ def _print_banner() -> None:
     if not sys.stderr.isatty():
         return
     try:
-        from colorama import Fore, Style, init as _colorama_init
+        from colorama import Fore, Style
+        from colorama import init as _colorama_init
         _colorama_init()
         blue, reset = Fore.BLUE, Style.RESET_ALL
     except ImportError:
         blue = reset = ""
     print(f"{blue}{_BANNER}{reset}", file=sys.stderr, flush=True)
 
-    
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point; returns a process exit code."""
 
     argv = list(sys.argv[1:] if argv is None else argv)
 
+    external = parse_external_diff_argv(argv)
+    if external is not None:
+        return _run_git_external(external)
+
+    if "--git-setup" in argv:
+        sys.stdout.write(SETUP_SNIPPET)
+        return EXIT_SAME
+
     if not any(a in ("-h", "--help", "--version", "-v") for a in argv):
         _print_banner()
-    
+
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    source = Path(args.source)
-    target = Path(args.target)
+    if args.git is not None:
+        return _run_git_revisions(args)
+    if args.target is None:
+        parser.error("the following arguments are required: target (or use --git REV)")
 
+    return _dispatch(args, Path(args.source), Path(args.target))
+
+
+def _run_git_revisions(args: argparse.Namespace) -> int:
+    """``--git REV[..REV2] PATH``: materialise blobs, then compare as usual."""
+    if args.target is not None:
+        return _fail("--git takes a single PATH; the revisions select the two sides")
+    if args.tui or args.watch is not None:
+        return _fail("--git cannot be combined with --tui or --watch")
+    try:
+        pair = materialise(args.git, Path(args.source))
+    except GitError as exc:
+        return _fail(f"git: {exc}")
+    with pair:
+        args._labels = (pair.source_label, pair.target_label)
+        return _dispatch(args, pair.source, pair.target)
+
+
+def _run_git_external(call: ExternalDiffCall) -> int:
+    """Act as ``diff.external``: Git supplies both files and expects exit 0."""
+    parser = build_parser()
+    args = parser.parse_args([*call.options, call.path])  # paths come from Git
+    if "--format" not in call.options:
+        args.format = "color"
+    args._labels = (call.old_label, call.new_label)
+    empty: Path | None = None
+    try:
+        source, target = call.old_file, call.new_file
+        if source is None or target is None:
+            tmp = tempfile.NamedTemporaryFile(
+                prefix="atrain-empty-", suffix=Path(call.path).suffix, delete=False
+            )
+            tmp.close()
+            empty = Path(tmp.name)
+            source = source or empty
+            target = target or empty
+        header = f"diff --atrain {call.old_label} {call.new_label}"
+        if call.similarity:
+            header += f" (similarity {call.similarity}%)"
+        print(header)
+        code = _dispatch(args, source, target)
+    finally:
+        if empty is not None:
+            empty.unlink(missing_ok=True)
+    return EXIT_ERROR if code == EXIT_ERROR else EXIT_SAME
+
+
+def _dispatch(args: argparse.Namespace, source: Path, target: Path) -> int:
+    """Shared tail of ``main``: validate, pick an engine, compare."""
     if args.tui:
         return _run_tui(source, target)
     if args.watch is not None:
         return _run_watch(args, source, target)
+
+    _resolve_mode(args, source, target)
     if args.cache and args.mode != "dir":
         return _fail("--cache applies to --mode dir only")
 
